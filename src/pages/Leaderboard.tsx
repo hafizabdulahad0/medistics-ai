@@ -12,38 +12,104 @@ const Leaderboard = () => {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
 
-  // Fetch leaderboard data
+  // Fetch leaderboard data with profiles
   const { data: leaderboardData = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('leaderboard_entries')
-        .select('*')
-        .order('total_score', { ascending: false })
-        .limit(50);
+      // First get all user answers to calculate scores
+      const { data: userAnswers, error: answersError } = await supabase
+        .from('user_answers')
+        .select(`
+          user_id,
+          is_correct,
+          time_taken,
+          created_at
+        `);
       
-      if (error) throw error;
-      return data || [];
+      if (answersError) {
+        console.error('Error fetching user answers:', answersError);
+        return [];
+      }
+
+      // Calculate user statistics
+      const userStats: Record<string, any> = {};
+      
+      userAnswers?.forEach(answer => {
+        if (!userStats[answer.user_id]) {
+          userStats[answer.user_id] = {
+            user_id: answer.user_id,
+            totalQuestions: 0,
+            correctAnswers: 0,
+            totalTime: 0,
+            answers: []
+          };
+        }
+        
+        userStats[answer.user_id].totalQuestions++;
+        if (answer.is_correct) {
+          userStats[answer.user_id].correctAnswers++;
+        }
+        userStats[answer.user_id].totalTime += answer.time_taken || 0;
+        userStats[answer.user_id].answers.push(answer);
+      });
+
+      // Calculate final scores and get user profiles
+      const leaderboardEntries = await Promise.all(
+        Object.values(userStats).map(async (stats: any) => {
+          // Get user profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, full_name')
+            .eq('id', stats.user_id)
+            .single();
+
+          // Calculate streak
+          let currentStreak = 0;
+          let bestStreak = 0;
+          stats.answers
+            .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+            .forEach((answer: any) => {
+              if (answer.is_correct) {
+                currentStreak++;
+                bestStreak = Math.max(bestStreak, currentStreak);
+              } else {
+                currentStreak = 0;
+              }
+            });
+
+          const accuracy = stats.totalQuestions > 0 ? 
+            Math.round((stats.correctAnswers / stats.totalQuestions) * 100) : 0;
+          
+          const averageTime = stats.totalQuestions > 0 ? 
+            Math.round(stats.totalTime / stats.totalQuestions) : 0;
+
+          // Calculate total score (weighted formula)
+          const totalScore = stats.correctAnswers * 10 + bestStreak * 5 + Math.max(0, 100 - averageTime);
+
+          return {
+            id: stats.user_id,
+            user_id: stats.user_id,
+            username: profile?.username || profile?.full_name || 'Anonymous',
+            total_score: totalScore,
+            accuracy,
+            best_streak: bestStreak,
+            total_questions: stats.totalQuestions,
+            correct_answers: stats.correctAnswers
+          };
+        })
+      );
+
+      // Sort by total score and return top 50
+      return leaderboardEntries
+        .filter(entry => entry.total_questions > 0) // Only include users who have answered questions
+        .sort((a, b) => b.total_score - a.total_score)
+        .slice(0, 50);
     }
   });
 
-  // Fetch user's rank
-  const { data: userRank } = useQuery({
-    queryKey: ['user-rank', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      
-      const { data, error } = await supabase
-        .from('leaderboard_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
-    },
-    enabled: !!user?.id
-  });
+  // Find user's rank
+  const userRank = leaderboardData.findIndex(entry => entry.user_id === user?.id) + 1;
+  const currentUserData = leaderboardData.find(entry => entry.user_id === user?.id);
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -124,7 +190,7 @@ const Leaderboard = () => {
         </div>
 
         {/* User's Current Rank */}
-        {userRank && (
+        {currentUserData && (
           <Card className="mb-8 bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-300 animate-scale-in backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
@@ -137,17 +203,17 @@ const Leaderboard = () => {
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-bold">
-                      {user?.email?.substring(0, 2).toUpperCase() || 'U'}
+                      {currentUserData.username?.substring(0, 2).toUpperCase() || 'U'}
                     </span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">You</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Score: {userRank.total_score}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{currentUserData.username}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Score: {currentUserData.total_score}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    #{leaderboardData.findIndex(entry => entry.user_id === user?.id) + 1 || 'N/A'}
+                    #{userRank || 'N/A'}
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Current Rank</p>
                 </div>
@@ -157,46 +223,48 @@ const Leaderboard = () => {
         )}
 
         {/* Top 3 Podium */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {leaderboardData.slice(0, 3).map((entry, index) => (
-            <Card 
-              key={entry.id} 
-              className={`relative overflow-hidden hover:scale-105 transition-all duration-300 animate-fade-in bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 backdrop-blur-sm ${
-                index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'
-              }`}
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className={`absolute top-0 left-0 right-0 h-2 ${getRankBadge(index + 1)}`}></div>
-              <CardHeader className="text-center pb-2">
-                <div className="flex justify-center mb-2">
-                  {getRankIcon(index + 1)}
-                </div>
-                <CardTitle className="text-lg text-gray-900 dark:text-white">
-                  #{index + 1}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-white font-bold text-lg">
-                    {entry.username?.substring(0, 2).toUpperCase() || 'U'}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  {entry.username || 'Anonymous'}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  @{entry.username || 'user'}
-                </p>
-                <div className="space-y-1">
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    {entry.total_score}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Total Score</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {leaderboardData.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {leaderboardData.slice(0, 3).map((entry, index) => (
+              <Card 
+                key={entry.id} 
+                className={`relative overflow-hidden hover:scale-105 transition-all duration-300 animate-fade-in bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 backdrop-blur-sm ${
+                  index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'
+                }`}
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className={`absolute top-0 left-0 right-0 h-2 ${getRankBadge(index + 1)}`}></div>
+                <CardHeader className="text-center pb-2">
+                  <div className="flex justify-center mb-2">
+                    {getRankIcon(index + 1)}
+                  </div>
+                  <CardTitle className="text-lg text-gray-900 dark:text-white">
+                    #{index + 1}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <span className="text-white font-bold text-lg">
+                      {entry.username?.substring(0, 2).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                    {entry.username || 'Anonymous'}
+                  </h3>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      {entry.total_score}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Total Score</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {entry.accuracy}% accuracy • {entry.total_questions} questions
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Rest of the Leaderboard */}
         <Card className="bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-300 animate-slide-up backdrop-blur-sm">
@@ -220,6 +288,10 @@ const Leaderboard = () => {
                   </div>
                 ))}
               </div>
+            ) : leaderboardData.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600 dark:text-gray-400">No data available yet. Start practicing to see the leaderboard!</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {leaderboardData.slice(3).map((entry, index) => (
@@ -241,7 +313,7 @@ const Leaderboard = () => {
                           {entry.username || 'Anonymous'}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          @{entry.username || 'user'}
+                          {entry.accuracy}% accuracy • {entry.total_questions} questions
                         </p>
                       </div>
                     </div>

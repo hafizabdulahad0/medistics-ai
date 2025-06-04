@@ -1,32 +1,9 @@
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Play, BookOpen } from 'lucide-react';
-
-const mockChapters = {
-  biology: [
-    { id: 'acellular-life', name: 'Acellular Life', chapter_number: 1, description: 'Study of viruses, viroids, and prions' },
-    { id: 'cell-biology', name: 'Cell Biology', chapter_number: 2, description: 'Structure and function of cells' },
-    { id: 'genetics', name: 'Genetics', chapter_number: 3, description: 'Heredity and genetic variation' },
-    { id: 'evolution', name: 'Evolution', chapter_number: 4, description: 'Changes in species over time' },
-    { id: 'ecology', name: 'Ecology', chapter_number: 5, description: 'Interactions between organisms and environment' },
-  ],
-  chemistry: [
-    { id: 'atomic-structure', name: 'Atomic Structure', chapter_number: 1, description: 'Structure of atoms and elements' },
-    { id: 'chemical-bonding', name: 'Chemical Bonding', chapter_number: 2, description: 'How atoms bond together' },
-    { id: 'organic-chemistry', name: 'Organic Chemistry', chapter_number: 3, description: 'Chemistry of carbon compounds' },
-    { id: 'acids-bases', name: 'Acids and Bases', chapter_number: 4, description: 'Properties of acids and bases' },
-    { id: 'thermodynamics', name: 'Thermodynamics', chapter_number: 5, description: 'Energy changes in reactions' },
-  ],
-  physics: [
-    { id: 'mechanics', name: 'Mechanics', chapter_number: 1, description: 'Motion and forces' },
-    { id: 'waves', name: 'Waves', chapter_number: 2, description: 'Wave properties and behavior' },
-    { id: 'electricity', name: 'Electricity', chapter_number: 3, description: 'Electric charges and circuits' },
-    { id: 'magnetism', name: 'Magnetism', chapter_number: 4, description: 'Magnetic fields and forces' },
-    { id: 'modern-physics', name: 'Modern Physics', chapter_number: 5, description: 'Quantum mechanics and relativity' },
-  ]
-};
+import { BookOpen, Play, Loader2 } from 'lucide-react';
+import { fetchChaptersBySubject, fetchMCQsByChapter, Chapter } from '@/utils/mcqData';
 
 interface ChapterSelectorProps {
   subject: string;
@@ -35,7 +12,47 @@ interface ChapterSelectorProps {
 }
 
 export const ChapterSelector = ({ subject, selectedChapter, onChapterSelect }: ChapterSelectorProps) => {
-  const chapters = mockChapters[subject as keyof typeof mockChapters] || [];
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const loadChapters = async () => {
+      setLoading(true);
+      const data = await fetchChaptersBySubject(subject);
+      setChapters(data);
+      
+      // Fetch question counts for each chapter
+      const counts: Record<string, number> = {};
+      for (const chapter of data) {
+        const mcqs = await fetchMCQsByChapter(chapter.id);
+        counts[chapter.id] = mcqs.length;
+      }
+      setQuestionCounts(counts);
+      setLoading(false);
+    };
+
+    if (subject) {
+      loadChapters();
+    }
+  }, [subject]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading chapters...</span>
+      </div>
+    );
+  }
+
+  if (chapters.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600 dark:text-gray-400">No chapters available for this subject.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -53,13 +70,13 @@ export const ChapterSelector = ({ subject, selectedChapter, onChapterSelect }: C
               selectedChapter === chapter.id 
                 ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30' 
                 : 'border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700'
-            } bg-purple-100/70 dark:bg-purple-900/30 backdrop-blur-sm`}
+            } bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 backdrop-blur-sm`}
             onClick={() => onChapterSelect(chapter.id)}
           >
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-purple-200 dark:bg-purple-800 rounded-lg flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-r from-purple-200 to-pink-200 dark:from-purple-800 dark:to-pink-800 rounded-lg flex items-center justify-center">
                     <BookOpen className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
@@ -72,7 +89,9 @@ export const ChapterSelector = ({ subject, selectedChapter, onChapterSelect }: C
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">~10 Questions</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {questionCounts[chapter.id] || 0} Questions
+                  </span>
                 </div>
               </div>
             </CardHeader>
@@ -80,7 +99,7 @@ export const ChapterSelector = ({ subject, selectedChapter, onChapterSelect }: C
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{chapter.description}</p>
               {selectedChapter === chapter.id && (
                 <div className="text-center">
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 bg-purple-600 text-white rounded-full text-sm">
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-sm">
                     <Play className="w-3 h-3" />
                     <span>Selected</span>
                   </div>

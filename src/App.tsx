@@ -12,6 +12,7 @@ import Battle from '@/pages/Battle';
 import AI from '@/pages/AI';
 import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
+import Profile from '@/pages/Profile';
 import NotFound from '@/pages/NotFound';
 import './App.css';
 
@@ -39,6 +40,9 @@ function App() {
               <Route path="/ai" element={<AI />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/password" element={<Profile />} />
+              <Route path="/profile/upgrade" element={<Profile />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Toaster />
