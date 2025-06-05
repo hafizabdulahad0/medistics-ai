@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
@@ -10,10 +9,13 @@ import Dashboard from '@/pages/Dashboard';
 import MCQs from '@/pages/MCQs';
 import Battle from '@/pages/Battle';
 import AI from '@/pages/AI';
+import AITestGeneratorPage from '@/pages/AITestGenerator';
+import AIChatbotPage from '@/pages/AIChatbot';
 import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
 import Profile from '@/pages/Profile';
 import NotFound from '@/pages/NotFound';
+import ChangePassword from '@/pages/ChangePassword';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -38,10 +40,12 @@ function App() {
               <Route path="/mcqs" element={<MCQs />} />
               <Route path="/battle" element={<Battle />} />
               <Route path="/ai" element={<AI />} />
+              <Route path="/ai/test-generator" element={<AITestGeneratorPage />} />
+              <Route path="/ai/chatbot" element={<AIChatbotPage />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/profile/password" element={<Profile />} />
+              <Route path="/profile/password" element={<ChangePassword />} />
               <Route path="/profile/upgrade" element={<Profile />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

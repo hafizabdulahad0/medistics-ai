@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { ProfileDropdown } from '@/components/ProfileDropdown';
 
 const Leaderboard = () => {
   const { theme, setTheme } = useTheme();
@@ -16,52 +18,62 @@ const Leaderboard = () => {
   const { data: leaderboardData = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      // First get all user answers to calculate scores
-      const { data: userAnswers, error: answersError } = await supabase
-        .from('user_answers')
-        .select(`
-          user_id,
-          is_correct,
-          time_taken,
-          created_at
-        `);
-      
-      if (answersError) {
-        console.error('Error fetching user answers:', answersError);
-        return [];
-      }
+      try {
+        // Get all user answers to calculate scores
+        const { data: userAnswers, error: answersError } = await supabase
+          .from('user_answers')
+          .select(`
+            user_id,
+            is_correct,
+            time_taken,
+            created_at
+          `);
+        
+        if (answersError) {
+          console.error('Error fetching user answers:', answersError);
+          return [];
+        }
 
-      // Calculate user statistics
-      const userStats: Record<string, any> = {};
-      
-      userAnswers?.forEach(answer => {
-        if (!userStats[answer.user_id]) {
-          userStats[answer.user_id] = {
-            user_id: answer.user_id,
+        // Get all profiles
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username, full_name');
+        
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          return [];
+        }
+
+        // Calculate user statistics
+        const userStats: Record<string, any> = {};
+        
+        userAnswers?.forEach(answer => {
+          if (!userStats[answer.user_id]) {
+            userStats[answer.user_id] = {
+              user_id: answer.user_id,
+              totalQuestions: 0,
+              correctAnswers: 0,
+              totalTime: 0,
+              answers: []
+            };
+          }
+          
+          userStats[answer.user_id].totalQuestions++;
+          if (answer.is_correct) {
+            userStats[answer.user_id].correctAnswers++;
+          }
+          userStats[answer.user_id].totalTime += answer.time_taken || 0;
+          userStats[answer.user_id].answers.push(answer);
+        });
+
+        // Include all profiles, even those without stats
+        const leaderboardEntries = profiles?.map(profile => {
+          const stats = userStats[profile.id] || {
             totalQuestions: 0,
             correctAnswers: 0,
             totalTime: 0,
             answers: []
           };
-        }
-        
-        userStats[answer.user_id].totalQuestions++;
-        if (answer.is_correct) {
-          userStats[answer.user_id].correctAnswers++;
-        }
-        userStats[answer.user_id].totalTime += answer.time_taken || 0;
-        userStats[answer.user_id].answers.push(answer);
-      });
-
-      // Calculate final scores and get user profiles
-      const leaderboardEntries = await Promise.all(
-        Object.values(userStats).map(async (stats: any) => {
-          // Get user profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username, full_name')
-            .eq('id', stats.user_id)
-            .single();
 
           // Calculate streak
           let currentStreak = 0;
@@ -87,23 +99,25 @@ const Leaderboard = () => {
           const totalScore = stats.correctAnswers * 10 + bestStreak * 5 + Math.max(0, 100 - averageTime);
 
           return {
-            id: stats.user_id,
-            user_id: stats.user_id,
-            username: profile?.username || profile?.full_name || 'Anonymous',
+            id: profile.id,
+            user_id: profile.id,
+            username: profile.username || profile.full_name || 'Anonymous',
             total_score: totalScore,
             accuracy,
             best_streak: bestStreak,
             total_questions: stats.totalQuestions,
             correct_answers: stats.correctAnswers
           };
-        })
-      );
+        }) || [];
 
-      // Sort by total score and return top 50
-      return leaderboardEntries
-        .filter(entry => entry.total_questions > 0) // Only include users who have answered questions
-        .sort((a, b) => b.total_score - a.total_score)
-        .slice(0, 50);
+        // Sort by total score and return top 50
+        return leaderboardEntries
+          .sort((a, b) => b.total_score - a.total_score)
+          .slice(0, 50);
+      } catch (error) {
+        console.error('Error in leaderboard query:', error);
+        return [];
+      }
     }
   });
 
@@ -114,13 +128,13 @@ const Leaderboard = () => {
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
-        return <Crown className="w-6 h-6 text-yellow-500" />;
+        return <Crown className="w-5 h-5 md:w-6 md:h-6 text-yellow-500" />;
       case 2:
-        return <Medal className="w-6 h-6 text-gray-400" />;
+        return <Medal className="w-5 h-5 md:w-6 md:h-6 text-gray-400" />;
       case 3:
-        return <Award className="w-6 h-6 text-amber-600" />;
+        return <Award className="w-5 h-5 md:w-6 md:h-6 text-amber-600" />;
       default:
-        return <Trophy className="w-6 h-6 text-purple-500" />;
+        return <Trophy className="w-5 h-5 md:w-6 md:h-6 text-purple-500" />;
     }
   };
 
@@ -137,19 +151,18 @@ const Leaderboard = () => {
     <div className="min-h-screen w-full bg-gradient-to-br from-white via-purple-50/30 to-pink-50/30 dark:bg-gradient-to-br dark:from-gray-900 dark:via-purple-900/10 dark:to-pink-900/10">
       {/* Header */}
       <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50">
-        <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-full">
+        <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center">
           <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
           </Link>
           
           <div className="flex items-center space-x-3">
             <img 
               src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" 
               alt="Medistics Logo" 
-              className="w-8 h-8 object-contain"
+              className="w-6 h-6 md:w-8 md:h-8 object-contain"
             />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Leaderboard</span>
+            <span className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">Leaderboard</span>
           </div>
           
           <div className="flex items-center space-x-3">
@@ -165,25 +178,21 @@ const Leaderboard = () => {
                 <Moon className="h-4 w-4" />
               )}
             </Button>
-            <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700">
-              Basic Plan
+            <Badge variant="secondary" className="hidden sm:block bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700 text-xs">
+              Free Plan
             </Badge>
-            <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">
-                {user?.email?.substring(0, 2).toUpperCase() || 'U'}
-              </span>
-            </div>
+            <ProfileDropdown />
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 lg:px-8 py-8 max-w-full">
+      <div className="container mx-auto px-4 lg:px-8 py-6 lg:py-8">
         {/* Hero Section */}
-        <div className="text-center mb-8 animate-fade-in">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+        <div className="text-center mb-6 lg:mb-8 animate-fade-in">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
             🏆 Leaderboard
           </h1>
-          <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg lg:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             See how you rank against the best medical students in Pakistan. 
             Climb the ladder and prove your expertise!
           </p>
@@ -191,31 +200,31 @@ const Leaderboard = () => {
 
         {/* User's Current Rank */}
         {currentUserData && (
-          <Card className="mb-8 bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-300 animate-scale-in backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
-                <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          <Card className="mb-6 lg:mb-8 bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-300 animate-scale-in backdrop-blur-sm">
+            <CardHeader className="p-4 lg:p-6">
+              <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white text-lg md:text-xl">
+                <Target className="w-4 h-4 md:w-5 md:h-5 text-purple-600 dark:text-purple-400" />
                 <span>Your Current Rank</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold">
+            <CardContent className="p-4 lg:p-6 pt-0">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center space-x-3 md:space-x-4">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-sm md:text-base">
                       {currentUserData.username?.substring(0, 2).toUpperCase() || 'U'}
                     </span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{currentUserData.username}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Score: {currentUserData.total_score}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm md:text-base">{currentUserData.username}</p>
+                    <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">Total Score: {currentUserData.total_score}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  <div className="text-xl md:text-2xl font-bold text-purple-600 dark:text-purple-400">
                     #{userRank || 'N/A'}
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Current Rank</p>
+                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">Current Rank</p>
                 </div>
               </div>
             </CardContent>
@@ -224,7 +233,7 @@ const Leaderboard = () => {
 
         {/* Top 3 Podium */}
         {leaderboardData.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
             {leaderboardData.slice(0, 3).map((entry, index) => (
               <Card 
                 key={entry.id} 
@@ -234,25 +243,25 @@ const Leaderboard = () => {
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className={`absolute top-0 left-0 right-0 h-2 ${getRankBadge(index + 1)}`}></div>
-                <CardHeader className="text-center pb-2">
+                <CardHeader className="text-center pb-2 p-4 lg:p-6">
                   <div className="flex justify-center mb-2">
                     {getRankIcon(index + 1)}
                   </div>
-                  <CardTitle className="text-lg text-gray-900 dark:text-white">
+                  <CardTitle className="text-base md:text-lg text-gray-900 dark:text-white">
                     #{index + 1}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-white font-bold text-lg">
+                <CardContent className="text-center p-4 lg:p-6 pt-0">
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <span className="text-white font-bold text-sm md:text-lg">
                       {entry.username?.substring(0, 2).toUpperCase() || 'U'}
                     </span>
                   </div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-sm md:text-base truncate">
                     {entry.username || 'Anonymous'}
                   </h3>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    <p className="text-lg md:text-2xl font-bold text-purple-600 dark:text-purple-400">
                       {entry.total_score}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Total Score</p>
@@ -268,63 +277,63 @@ const Leaderboard = () => {
 
         {/* Rest of the Leaderboard */}
         <Card className="bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-300 animate-slide-up backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
-              <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          <CardHeader className="p-4 lg:p-6">
+            <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white text-lg md:text-xl">
+              <Users className="w-4 h-4 md:w-5 md:h-5 text-purple-600 dark:text-purple-400" />
               <span>Top Students</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 lg:p-6 pt-0">
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(10)].map((_, i) => (
                   <div key={i} className="flex items-center space-x-4 p-3 animate-pulse">
-                    <div className="w-10 h-10 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                    <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
                     <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
-                      <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded w-1/6"></div>
+                      <div className="h-3 md:h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
+                      <div className="h-2 md:h-3 bg-gray-300 dark:bg-gray-700 rounded w-1/6"></div>
                     </div>
-                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-16"></div>
+                    <div className="h-3 md:h-4 bg-gray-300 dark:bg-gray-700 rounded w-16"></div>
                   </div>
                 ))}
               </div>
             ) : leaderboardData.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-600 dark:text-gray-400">No data available yet. Start practicing to see the leaderboard!</p>
+                <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base">No data available yet. Start practicing to see the leaderboard!</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {leaderboardData.slice(3).map((entry, index) => (
                   <div 
                     key={entry.id}
-                    className="flex items-center space-x-4 p-3 rounded-lg bg-white/60 dark:bg-gray-800/50 hover:bg-purple-200/50 dark:hover:bg-purple-900/40 transition-all duration-300 border border-purple-100 dark:border-purple-800 backdrop-blur-sm"
+                    className="flex items-center space-x-3 md:space-x-4 p-3 rounded-lg bg-white/60 dark:bg-gray-800/50 hover:bg-purple-200/50 dark:hover:bg-purple-900/40 transition-all duration-300 border border-purple-100 dark:border-purple-800 backdrop-blur-sm"
                   >
-                    <div className="flex items-center space-x-3 flex-1">
-                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400 w-8">
+                    <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
+                      <span className="text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 w-6 md:w-8 flex-shrink-0">
                         #{index + 4}
                       </span>
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">
+                      <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-bold text-xs md:text-sm">
                           {entry.username?.substring(0, 2).toUpperCase() || 'U'}
                         </span>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white text-sm md:text-base truncate">
                           {entry.username || 'Anonymous'}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
                           {entry.accuracy}% accuracy • {entry.total_questions} questions
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
                       <div className="text-right">
-                        <p className="font-bold text-purple-600 dark:text-purple-400">
+                        <p className="font-bold text-purple-600 dark:text-purple-400 text-sm md:text-base">
                           {entry.total_score}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Score</p>
                       </div>
-                      <Star className="w-4 h-4 text-yellow-500" />
+                      <Star className="w-3 h-3 md:w-4 md:h-4 text-yellow-500 flex-shrink-0" />
                     </div>
                   </div>
                 ))}

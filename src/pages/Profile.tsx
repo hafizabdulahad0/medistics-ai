@@ -16,9 +16,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState({
     full_name: '',
-    username: '',
-    medical_school: '',
-    year_of_study: 1
+    username: ''
   });
 
   useEffect(() => {
@@ -36,15 +34,20 @@ const Profile = () => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Error fetching profile:', error);
+        return;
       }
 
       if (data) {
         setProfile({
-          full_name: data.full_name || '',
-          username: data.username || '',
-          medical_school: data.medical_school || '',
-          year_of_study: data.year_of_study || 1
+          full_name: data.full_name || user?.user_metadata?.full_name || '',
+          username: data.username || user?.user_metadata?.username || ''
+        });
+      } else {
+        // If no profile exists, use user metadata
+        setProfile({
+          full_name: user?.user_metadata?.full_name || '',
+          username: user?.user_metadata?.username || ''
         });
       }
     } catch (error: any) {
@@ -54,15 +57,51 @@ const Profile = () => {
 
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!profile.full_name.trim() || !profile.username.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Check if username is already taken (by someone else)
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', profile.username)
+        .neq('id', user?.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      if (existingProfile) {
+        toast({
+          title: "Username Taken",
+          description: "This username is already in use. Please choose another.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Upsert the profile
       const { error } = await supabase
         .from('profiles')
         .upsert({
           id: user?.id,
-          ...profile,
+          full_name: profile.full_name.trim(),
+          username: profile.username.trim(),
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
         });
 
       if (error) throw error;
@@ -72,34 +111,14 @@ const Profile = () => {
         description: "Your profile has been updated successfully.",
       });
     } catch (error: any) {
+      console.error('Profile update error:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update profile. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updatePassword = async () => {
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: 'new-password' // This would typically come from a form
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Password updated",
-        description: "Your password has been updated successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
     }
   };
 
@@ -109,7 +128,6 @@ const Profile = () => {
         <div className="mb-6">
           <Link to="/dashboard" className="flex items-center text-purple-600 hover:text-purple-700 mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Profile Settings</h1>
           <p className="text-gray-600 dark:text-gray-300">Manage your account information</p>
@@ -129,50 +147,32 @@ const Profile = () => {
                   type="email"
                   value={user?.email || ''}
                   disabled
-                  className="bg-gray-100"
+                  className="bg-gray-100 dark:bg-gray-800"
                 />
+                <p className="text-sm text-gray-500 mt-1">Email cannot be changed here</p>
               </div>
 
               <div>
-                <Label htmlFor="full_name">Full Name</Label>
+                <Label htmlFor="full_name">Full Name *</Label>
                 <Input
                   id="full_name"
                   value={profile.full_name}
                   onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
                   placeholder="Enter your full name"
+                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">Username *</Label>
                 <Input
                   id="username"
                   value={profile.username}
                   onChange={(e) => setProfile({ ...profile, username: e.target.value })}
                   placeholder="Enter your username"
+                  required
                 />
-              </div>
-
-              <div>
-                <Label htmlFor="medical_school">Medical School</Label>
-                <Input
-                  id="medical_school"
-                  value={profile.medical_school}
-                  onChange={(e) => setProfile({ ...profile, medical_school: e.target.value })}
-                  placeholder="Enter your medical school"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="year_of_study">Year of Study</Label>
-                <Input
-                  id="year_of_study"
-                  type="number"
-                  min="1"
-                  max="6"
-                  value={profile.year_of_study}
-                  onChange={(e) => setProfile({ ...profile, year_of_study: parseInt(e.target.value) })}
-                />
+                <p className="text-sm text-gray-500 mt-1">This will be displayed on leaderboards</p>
               </div>
 
               <Button type="submit" disabled={loading} className="w-full">

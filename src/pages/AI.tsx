@@ -1,12 +1,10 @@
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun } from 'lucide-react';
-import { AIStudyChat } from '@/components/ai/AIStudyChat';
-import { AITestGenerator } from '@/components/ai/AITestGenerator';
+import { ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun, MessageSquare } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -21,30 +19,16 @@ const AI = () => {
         <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center max-w-7xl">
           <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
           </Link>
           
           <div className="flex items-center space-x-3">
-            <img 
-              src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" 
-              alt="Medistics Logo" 
-              className="w-8 h-8 object-contain"
-            />
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medistics Logo" className="w-8 h-8 object-contain" />
             <span className="text-xl font-bold text-gray-900 dark:text-white">AI Study Assistant</span>
           </div>
           
           <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
+            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700">
               Basic Plan
@@ -65,28 +49,55 @@ const AI = () => {
             🤖 AI Study Assistant
           </h1>
           <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Get personalized help with your medical studies. Chat with our AI tutor or generate custom practice tests.
+            Choose your preferred AI study method. Get personalized help with your medical studies.
           </p>
         </div>
 
-        {/* Feature Cards */}
+        {/* Main AI Options */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 max-w-4xl mx-auto">
+          <Link to="/ai/chatbot">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800 hover:scale-105 hover:shadow-lg transition-all duration-300 animate-fade-in cursor-pointer h-full">
+              <CardHeader className="text-center pb-4">
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-blue-600 dark:text-blue-400" />
+                <CardTitle className="text-gray-900 dark:text-white text-xl mb-2">AI Study Chatbot</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">
+                  Get instant answers to your medical questions and study help through interactive chat
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white w-full">
+                  Start Chatting
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/ai/test-generator">
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800 hover:scale-105 hover:shadow-lg transition-all duration-300 animate-fade-in cursor-pointer h-full">
+              <CardHeader className="text-center pb-4">
+                <FileText className="h-12 w-12 mx-auto mb-4 text-purple-600 dark:text-purple-400" />
+                <CardTitle className="text-gray-900 dark:text-white text-xl mb-2">AI Test Generator</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">
+                  Generate personalized practice tests with custom difficulty and topics
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white w-full">
+                  Generate Test
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Feature Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:scale-105 transition-transform duration-300 animate-fade-in">
             <CardHeader className="text-center">
               <Bot className="h-8 w-8 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
-              <CardTitle className="text-gray-900 dark:text-white">AI Chat Tutor</CardTitle>
+              <CardTitle className="text-gray-900 dark:text-white">AI-Powered</CardTitle>
               <CardDescription className="text-gray-600 dark:text-gray-400">
-                Get instant answers to your medical questions
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:scale-105 transition-transform duration-300 animate-fade-in">
-            <CardHeader className="text-center">
-              <FileText className="h-8 w-8 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
-              <CardTitle className="text-gray-900 dark:text-white">Custom Tests</CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
-                Generate personalized practice tests
+                Advanced AI technology for medical education
               </CardDescription>
             </CardHeader>
           </Card>
@@ -96,50 +107,37 @@ const AI = () => {
               <Brain className="h-8 w-8 mx-auto mb-2 text-green-600 dark:text-green-400" />
               <CardTitle className="text-gray-900 dark:text-white">Smart Learning</CardTitle>
               <CardDescription className="text-gray-600 dark:text-gray-400">
-                AI adapts to your learning style
+                Adaptive learning that matches your pace
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:scale-105 transition-transform duration-300 animate-fade-in">
+            <CardHeader className="text-center">
+              <Zap className="h-8 w-8 mx-auto mb-2 text-yellow-600 dark:text-yellow-400" />
+              <CardTitle className="text-gray-900 dark:text-white">Instant Results</CardTitle>
+              <CardDescription className="text-gray-600 dark:text-gray-400">
+                Get immediate feedback and explanations
               </CardDescription>
             </CardHeader>
           </Card>
         </div>
 
-        {/* AI Tools */}
-        <Card className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-300 animate-slide-up">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
-              <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              <span>AI-Powered Study Tools</span>
-            </CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-400">
-              Choose your preferred AI study method
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="chat" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-700">
-                <TabsTrigger 
-                  value="chat" 
-                  className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-900 dark:text-white hover:bg-purple-100 dark:hover:bg-purple-900/30"
-                >
-                  Chat Tutor
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="test" 
-                  className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-900 dark:text-white hover:bg-purple-100 dark:hover:bg-purple-900/30"
-                >
-                  Test Generator
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="chat" className="mt-6">
-                <AIStudyChat />
-              </TabsContent>
-              
-              <TabsContent value="test" className="mt-6">
-                <AITestGenerator />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        {/* Info Section */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg text-sm text-blue-800 dark:text-blue-200 max-w-4xl mx-auto">
+          <div className="flex items-start space-x-2">
+            <Bot className="h-5 w-5 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium mb-2">How AI Study Assistant works:</p>
+              <ul className="space-y-1 text-xs">
+                <li>• <strong>AI Chatbot:</strong> Ask questions and get detailed explanations on any medical topic</li>
+                <li>• <strong>Test Generator:</strong> Create custom practice tests with AI-generated questions</li>
+                <li>• <strong>Progress Tracking:</strong> Monitor your learning progress and identify areas for improvement</li>
+                <li>• <strong>Personalized Learning:</strong> AI adapts to your learning style and knowledge level</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +12,7 @@ import { ProgressTracker } from '@/components/mcq/ProgressTracker';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserStats, Subject, Chapter } from '@/utils/mcqData';
-
 type Screen = 'subjects' | 'chapters' | 'settings' | 'quiz';
-
 const MCQs = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>('subjects');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -29,10 +26,13 @@ const MCQs = () => {
     averageTime: 0,
     bestStreak: 0
   });
-  
-  const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
-
+  const {
+    theme,
+    setTheme
+  } = useTheme();
+  const {
+    user
+  } = useAuth();
   useEffect(() => {
     const loadUserStats = async () => {
       if (user?.id) {
@@ -40,113 +40,65 @@ const MCQs = () => {
         setUserStats(stats);
       }
     };
-
     loadUserStats();
   }, [user?.id]);
-
   const handleSubjectSelect = (subject: Subject) => {
     setSelectedSubject(subject);
     setCurrentScreen('chapters');
   };
-
   const handleChapterSelect = (chapter: Chapter) => {
     setSelectedChapter(chapter);
     setCurrentScreen('settings');
   };
-
   const handleStartQuiz = (timerEnabledValue: boolean, timePerQuestionValue: number) => {
     setTimerEnabled(timerEnabledValue);
     setTimePerQuestion(timePerQuestionValue);
     setCurrentScreen('quiz');
   };
-
   const handleBackToSubjects = () => {
     setCurrentScreen('subjects');
     setSelectedSubject(null);
     setSelectedChapter(null);
   };
-
   const handleBackToChapters = () => {
     setCurrentScreen('chapters');
     setSelectedChapter(null);
   };
-
   const handleBackToSettings = () => {
     setCurrentScreen('settings');
   };
-
   const renderContent = () => {
     switch (currentScreen) {
       case 'subjects':
         return <SubjectSelectionScreen onSubjectSelect={handleSubjectSelect} />;
-      
       case 'chapters':
-        return selectedSubject ? (
-          <ChapterSelectionScreen 
-            subject={selectedSubject}
-            onChapterSelect={handleChapterSelect}
-            onBack={handleBackToSubjects}
-          />
-        ) : null;
-      
+        return selectedSubject ? <ChapterSelectionScreen subject={selectedSubject} onChapterSelect={handleChapterSelect} onBack={handleBackToSubjects} /> : null;
       case 'settings':
-        return selectedSubject && selectedChapter ? (
-          <QuizSettingsScreen
-            subject={selectedSubject}
-            chapter={selectedChapter}
-            onStartQuiz={handleStartQuiz}
-            onBack={handleBackToChapters}
-          />
-        ) : null;
-      
+        return selectedSubject && selectedChapter ? <QuizSettingsScreen subject={selectedSubject} chapter={selectedChapter} onStartQuiz={handleStartQuiz} onBack={handleBackToChapters} /> : null;
       case 'quiz':
-        return selectedSubject && selectedChapter ? (
-          <MCQDisplay 
-            subject={selectedSubject.id} 
-            chapter={selectedChapter.id}
-            onBack={handleBackToSettings}
-            timerEnabled={timerEnabled}
-            timePerQuestion={timePerQuestion}
-          />
-        ) : null;
-      
+        return selectedSubject && selectedChapter ? <MCQDisplay subject={selectedSubject.id} chapter={selectedChapter.id} onBack={handleBackToSettings} timerEnabled={timerEnabled} timePerQuestion={timePerQuestion} /> : null;
       default:
         return <SubjectSelectionScreen onSubjectSelect={handleSubjectSelect} />;
     }
   };
-
-  return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-white via-purple-50/30 to-pink-50/30 dark:bg-gradient-to-br dark:from-gray-900 dark:via-purple-900/10 dark:to-pink-900/10">
+  return <div className="min-h-screen w-full bg-gradient-to-br from-white via-purple-50/30 to-pink-50/30 dark:bg-gradient-to-br dark:from-gray-900 dark:via-purple-900/10 dark:to-pink-900/10">
       {/* Header */}
       <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50">
         <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4 flex justify-between items-center max-w-full">
           <Link to="/dashboard" className="flex items-center space-x-1 sm:space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
             <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm">Back to Dashboard</span>
+            
           </Link>
           
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <img 
-              src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" 
-              alt="Medistics Logo" 
-              className="w-6 h-6 sm:w-8 sm:h-8 object-contain"
-            />
+            <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medistics Logo" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
             <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white hidden sm:inline">Practice MCQs</span>
             <span className="text-sm font-bold text-gray-900 dark:text-white sm:hidden">MCQs</span>
           </div>
           
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-8 h-8 sm:w-9 sm:h-9 p-0 hover:scale-110 transition-transform duration-200"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <Moon className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
+            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-8 h-8 sm:w-9 sm:h-9 p-0 hover:scale-110 transition-transform duration-200">
+              {theme === "dark" ? <Sun className="h-3 w-3 sm:h-4 sm:w-4" /> : <Moon className="h-3 w-3 sm:h-4 sm:w-4" />}
             </Button>
             <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700 text-xs sm:text-sm px-2 py-1">
               Basic Plan
@@ -162,8 +114,7 @@ const MCQs = () => {
 
       <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-full">
         {/* Show hero section and stats only on subjects screen */}
-        {currentScreen === 'subjects' && (
-          <>
+        {currentScreen === 'subjects' && <>
             {/* Hero Section */}
             <div className="text-center mb-6 sm:mb-8 animate-fade-in">
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
@@ -230,14 +181,11 @@ const MCQs = () => {
                 </CardContent>
               </Card>
             </div>
-          </>
-        )}
+          </>}
 
         {/* Render current screen content */}
         {renderContent()}
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default MCQs;
