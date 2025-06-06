@@ -53,7 +53,7 @@ export const ChapterSelectionScreen = ({ subject, onChapterSelect, onBack }: Cha
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-2 sm:px-0">
+    <div className="max-w-6xl mx-auto px-2 sm:px-4">
       <Button 
         variant="outline" 
         onClick={onBack}
@@ -72,7 +72,7 @@ export const ChapterSelectionScreen = ({ subject, onChapterSelect, onBack }: Cha
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
         {chapters.map((chapter, index) => (
           <motion.div
             key={chapter.id}
@@ -81,39 +81,42 @@ export const ChapterSelectionScreen = ({ subject, onChapterSelect, onBack }: Cha
             transition={{ delay: index * 0.1 }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            className="w-full"
           >
             <Card 
-              className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 ${
+              className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 h-full ${
                 selectedChapter?.id === chapter.id 
                   ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30' 
                   : 'border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700'
               } bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 backdrop-blur-sm`}
               onClick={() => setSelectedChapter(chapter)}
             >
-              <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-purple-200 to-pink-200 dark:from-purple-800 dark:to-pink-800 rounded-lg flex items-center justify-center">
-                      <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400" />
+              <CardHeader className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start space-x-2 sm:space-x-3 flex-1 min-w-0">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-purple-200 to-pink-200 dark:from-purple-800 dark:to-pink-800 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-purple-600 dark:text-purple-400" />
                     </div>
-                    <div>
-                      <CardTitle className="text-base sm:text-lg text-gray-900 dark:text-white">
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="text-sm sm:text-base lg:text-lg text-gray-900 dark:text-white leading-tight">
                         Chapter {chapter.chapter_number}
                       </CardTitle>
-                      <CardDescription className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                      <CardDescription className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
                         {chapter.name}
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {questionCounts[chapter.id] || 0} Questions
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {questionCounts[chapter.id] || 0} Qs
                     </span>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{chapter.description}</p>
+              <CardContent className="px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6 pt-0">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
+                  {chapter.description}
+                </p>
               </CardContent>
             </Card>
           </motion.div>
@@ -128,11 +131,11 @@ export const ChapterSelectionScreen = ({ subject, onChapterSelect, onBack }: Cha
         >
           <Button
             onClick={handleContinue}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg hover:scale-105 transition-all duration-300 w-full sm:w-auto"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 sm:px-6 lg:px-8 py-3 sm:py-4 text-sm sm:text-base lg:text-lg hover:scale-105 transition-all duration-300 w-full sm:w-auto"
             size="lg"
           >
             Continue with {selectedChapter.name}
-            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+            <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 ml-2" />
           </Button>
         </motion.div>
       )}

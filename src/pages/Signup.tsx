@@ -42,25 +42,16 @@ const Signup = () => {
   // Email validation and availability check
   useEffect(() => {
     const checkEmail = async () => {
-      if (formData.email && formData.email.includes('@')) {
+      if (formData.email && formData.email.includes('@') && formData.email.length > 5) {
         setCheckingEmail(true);
-        try {
-          // Check if email exists in profiles table (since we can't access auth.users directly)
-          const { data } = await supabase
-            .from('profiles')
-            .select('id')
-            .limit(1);
-
-          // For now, we'll rely on Supabase auth error during signup for email uniqueness
-          setEmailExists(false);
-        } catch (error) {
-          console.error('Error checking email:', error);
-        }
+        setEmailExists(false); // Always allow signup, just checking format
         setCheckingEmail(false);
+      } else {
+        setEmailExists(false);
       }
     };
 
-    const timeoutId = setTimeout(checkEmail, 500);
+    const timeoutId = setTimeout(checkEmail, 1000);
     return () => clearTimeout(timeoutId);
   }, [formData.email]);
 
@@ -74,17 +65,20 @@ const Signup = () => {
             .from('profiles')
             .select('username')
             .eq('username', formData.username)
-            .single();
+            .maybeSingle();
           
           setUsernameExists(!!data && !error);
         } catch (error) {
           console.error('Error checking username:', error);
+          setUsernameExists(false);
         }
         setCheckingUsername(false);
+      } else {
+        setUsernameExists(false);
       }
     };
 
-    const timeoutId = setTimeout(checkUsername, 500);
+    const timeoutId = setTimeout(checkUsername, 1000);
     return () => clearTimeout(timeoutId);
   }, [formData.username]);
 
@@ -95,9 +89,6 @@ const Signup = () => {
     // Email validation
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Please enter a valid email address';
-    }
-    if (emailExists) {
-      errors.email = 'This email is already registered';
     }
 
     // Username validation
@@ -131,7 +122,7 @@ const Signup = () => {
     }
 
     setValidationErrors(errors);
-  }, [formData, emailExists, usernameExists]);
+  }, [formData, usernameExists]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -153,10 +144,10 @@ const Signup = () => {
       return;
     }
 
-    if (emailExists || usernameExists) {
+    if (usernameExists) {
       toast({
-        title: "Account Already Exists",
-        description: "Please use different email or username",
+        title: "Username Taken",
+        description: "Please choose a different username",
         variant: "destructive",
       });
       return;
@@ -165,18 +156,18 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      const { error } = await signUp(formData.email, formData.password, {
-        username: formData.username,
-        full_name: formData.fullName
+      console.log('Submitting signup with data:', {
+        email: formData.email,
+        fullName: formData.fullName,
+        username: formData.username
       });
 
-      if (error) {
-        toast({
-          title: "Signup Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
+      const { data, error } = await signUp(formData.email, formData.password, {
+        fullName: formData.fullName,
+        username: formData.username
+      });
+
+      if (!error && data) {
         toast({
           title: "Account Created!",
           description: "Welcome to Medistics! You can now start learning.",
@@ -184,6 +175,7 @@ const Signup = () => {
         navigate('/dashboard');
       }
     } catch (error: any) {
+      console.error('Signup submission error:', error);
       toast({
         title: "Error",
         description: error.message || "An unexpected error occurred",
@@ -345,7 +337,7 @@ const Signup = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" 
-                disabled={loading || Object.keys(validationErrors).length > 0 || emailExists || usernameExists}
+                disabled={loading || Object.keys(validationErrors).length > 0 || usernameExists}
               >
                 {loading ? 'Creating Account...' : 'Create Account'}
               </Button>

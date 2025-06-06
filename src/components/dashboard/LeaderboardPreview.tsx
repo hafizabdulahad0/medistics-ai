@@ -24,7 +24,7 @@ export const LeaderboardPreview = () => {
         // Get all user answers to calculate scores
         const { data: userAnswers, error: answersError } = await supabase
           .from('user_answers')
-          .select('user_id, is_correct');
+          .select('user_id, is_correct, time_taken, created_at');
         
         if (answersError) {
           console.error('Error fetching user answers:', answersError);
@@ -49,6 +49,8 @@ export const LeaderboardPreview = () => {
             userStats[answer.user_id] = {
               totalQuestions: 0,
               correctAnswers: 0,
+              totalTime: 0,
+              answers: []
             };
           }
           
@@ -56,29 +58,54 @@ export const LeaderboardPreview = () => {
           if (answer.is_correct) {
             userStats[answer.user_id].correctAnswers++;
           }
+          userStats[answer.user_id].totalTime += answer.time_taken || 0;
+          userStats[answer.user_id].answers.push(answer);
         });
 
-        // Create leaderboard entries
-        const leaderboardEntries = profiles?.map(profile => {
-          const stats = userStats[profile.id] || {
-            totalQuestions: 0,
-            correctAnswers: 0,
-          };
+        // Create leaderboard entries for users with activity
+        const leaderboardEntries = profiles
+          ?.filter(profile => userStats[profile.id]?.totalQuestions > 0)
+          .map(profile => {
+            const stats = userStats[profile.id];
 
-          const accuracy = stats.totalQuestions > 0 ? 
-            Math.round((stats.correctAnswers / stats.totalQuestions) * 100) : 0;
-          
-          const totalScore = stats.correctAnswers * 10 + accuracy;
+            // Calculate streak
+            let currentStreak = 0;
+            let bestStreak = 0;
+            stats.answers
+              .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              .forEach((answer: any) => {
+                if (answer.is_correct) {
+                  currentStreak++;
+                  bestStreak = Math.max(bestStreak, currentStreak);
+                } else {
+                  currentStreak = 0;
+                }
+              });
 
-          return {
-            id: profile.id,
-            user_id: profile.id,
-            username: profile.username || profile.full_name || 'Anonymous',
-            total_score: totalScore,
-            accuracy,
-            total_questions: stats.totalQuestions,
-          };
-        }) || [];
+            const accuracy = stats.totalQuestions > 0 ? 
+              Math.round((stats.correctAnswers / stats.totalQuestions) * 100) : 0;
+            
+            const averageTime = stats.totalQuestions > 0 ? 
+              Math.round(stats.totalTime / stats.totalQuestions) : 0;
+
+            // Calculate total score (improved formula)
+            const basePoints = stats.correctAnswers * 10; // 10 points per correct answer
+            const streakBonus = bestStreak * 5; // 5 points per best streak
+            const accuracyBonus = accuracy; // 1 point per 1% accuracy
+            const speedBonus = Math.max(0, 60 - averageTime); // Bonus for faster answers
+            
+            const totalScore = basePoints + streakBonus + accuracyBonus + speedBonus;
+
+            return {
+              id: profile.id,
+              user_id: profile.id,
+              username: profile.username || profile.full_name || 'Anonymous',
+              total_score: totalScore,
+              accuracy,
+              total_questions: stats.totalQuestions,
+              correct_answers: stats.correctAnswers
+            };
+          }) || [];
 
         // Sort by total score and return top 5
         return leaderboardEntries

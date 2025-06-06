@@ -13,12 +13,10 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
     queryKey: ['user-progress', userId],
     queryFn: async () => {
       if (!userId) return [];
-      
       const { data, error } = await supabase
         .from('user_progress')
         .select('*')
         .eq('user_id', userId);
-      
       if (error) throw error;
       return data || [];
     },
@@ -30,39 +28,45 @@ export const ProgressTracker = ({ userId }: ProgressTrackerProps) => {
   const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
 
   return (
-    <div className="flex space-x-4">
-      <Card className="min-w-[120px] bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 backdrop-blur-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-2">
-            <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Questions</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{totalQuestions}</p>
-            </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <Card className="bg-gradient-to-br from-blue-100/70 via-blue-50/50 to-purple-50/30 dark:from-blue-900/30 dark:via-blue-800/20 dark:to-purple-900/10 border-blue-200 dark:border-blue-800">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">
+            Total Questions
+          </CardTitle>
+          <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {totalQuestions}
           </div>
         </CardContent>
       </Card>
 
-      <Card className="min-w-[120px] bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 backdrop-blur-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-2">
-            <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Accuracy</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{overallAccuracy}%</p>
-            </div>
+      <Card className="bg-gradient-to-br from-green-100/70 via-green-50/50 to-blue-50/30 dark:from-green-900/30 dark:via-green-800/20 dark:to-blue-900/10 border-green-200 dark:border-green-800">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">
+            Correct Answers
+          </CardTitle>
+          <Trophy className="h-4 w-4 text-green-600 dark:text-green-400" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            {totalCorrect}
           </div>
         </CardContent>
       </Card>
 
-      <Card className="min-w-[120px] bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 backdrop-blur-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-2">
-            <Trophy className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Chapters</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{progress?.length || 0}</p>
-            </div>
+      <Card className="bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 border-purple-200 dark:border-purple-800">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">
+            Accuracy Rate
+          </CardTitle>
+          <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            {overallAccuracy}%
           </div>
         </CardContent>
       </Card>

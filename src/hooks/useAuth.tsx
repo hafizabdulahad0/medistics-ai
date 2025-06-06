@@ -40,25 +40,30 @@ export const useAuth = () => {
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
+      console.log('Starting signup with:', { email, userData });
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: userData.name,
-            username: userData.email.split('@')[0],
-            province: userData.province,
-            city: userData.city,
-            plan: userData.plan
-          }
+            full_name: userData.fullName || userData.full_name,
+            username: userData.username,
+          },
+          emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Signup error:', error);
+        throw error;
+      }
+
+      console.log('Signup successful:', data);
 
       toast({
         title: "Account created!",
-        description: "Please check your email to verify your account.",
+        description: "Welcome to Medistics! You can now start learning.",
       });
 
       return { data, error: null };
@@ -102,6 +107,9 @@ export const useAuth = () => {
         title: "Signed out",
         description: "You have been successfully signed out.",
       });
+      
+      // Redirect to home page after successful logout
+      window.location.href = '/';
     } catch (error: any) {
       console.error('Signout error:', error);
       toast({
