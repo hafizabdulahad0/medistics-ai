@@ -147,7 +147,7 @@ const Index = () => {
         </Badge>
         
         <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6 leading-tight animate-fade-in">
-          Master Medical Sciences with
+          Ace the MDCAT with
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 animate-pulse"> AI Intelligence</span>
         </h1>
         
@@ -273,7 +273,7 @@ const Index = () => {
             Ready to Transform Your Medical Studies?
           </h2>
           <p className="text-lg md:text-xl mb-8 opacity-90 max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            Join thousands of medical students who are already acing their exams with Medistics.
+            Join thousands of MDCAT Aspirants who are already acing their exams with Medistics.
           </p>
           <Link to="/signup">
             <Button size="lg" variant="secondary" className="text-lg px-8 py-3 bg-white text-purple-600 hover:bg-gray-100 hover:scale-105 transition-all duration-300 shadow-xl hover:shadow-2xl animate-scale-in" style={{ animationDelay: '0.4s' }}>
@@ -298,7 +298,7 @@ const Index = () => {
                 <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Medistics</span>
               </div>
               <p className="text-gray-400">
-                Empowering medical students across Pakistan with AI-powered learning.
+                Empowering MDCAT across Pakistan with AI-powered learning.
               </p>
             </div>
             

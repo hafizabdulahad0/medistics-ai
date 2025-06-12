@@ -1,4 +1,4 @@
-
+// @/components/battle/BattleGame.tsx
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,89 +6,79 @@ import { Progress } from '@/components/ui/progress';
 import { Timer, Users, Target, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Mock questions for demonstration. In a real app, these would come from the backend,
+// possibly filtered by the `subject` defined in `roomDetails`.
+const mockQuestions = [
+  { id: '1', question: 'What is the largest organ in the human body?', options: ['Heart', 'Liver', 'Skin', 'Brain'], correct_answer: 'Skin' },
+  { id: '2', question: 'Which bone is the longest in the human body?', options: ['Tibia', 'Femur', 'Humerus', 'Radius'], correct_answer: 'Femur' },
+  { id: '3', question: 'What is the normal resting heart rate for adults?', options: ['40-60 bpm', '60-100 bpm', '100-120 bpm', '120-140 bpm'], correct_answer: '60-100 bpm' },
+  { id: '4', question: 'Which blood type is considered the universal donor?', options: ['A+', 'B+', 'AB+', 'O-'], correct_answer: 'O-' },
+  { id: '5', question: 'What is the medical term for high blood pressure?', options: ['Hypotension', 'Hypertension', 'Tachycardia', 'Bradycardia'], correct_answer: 'Hypertension' }
+];
+
 interface BattleGameProps {
   roomCode: string;
   onGameEnd: (results: any) => void;
   onLeave: () => void;
+  roomDetails: { // New prop to receive actual room settings
+    time_per_question: number;
+    total_questions: number;
+    max_players: number;
+    battle_participants: any[]; // Used for displaying player count
+    subject: string; // Subject for questions (mocked for now)
+  };
 }
 
-interface Question {
-  id: string;
-  question: string;
-  options: string[];
-  correct_answer: string;
-}
-
-const mockQuestions: Question[] = [
-  {
-    id: '1',
-    question: 'What is the largest organ in the human body?',
-    options: ['Heart', 'Liver', 'Skin', 'Brain'],
-    correct_answer: 'Skin'
-  },
-  {
-    id: '2',
-    question: 'Which bone is the longest in the human body?',
-    options: ['Tibia', 'Femur', 'Humerus', 'Radius'],
-    correct_answer: 'Femur'
-  },
-  {
-    id: '3',
-    question: 'What is the normal resting heart rate for adults?',
-    options: ['40-60 bpm', '60-100 bpm', '100-120 bpm', '120-140 bpm'],
-    correct_answer: '60-100 bpm'
-  },
-  {
-    id: '4',
-    question: 'Which blood type is considered the universal donor?',
-    options: ['A+', 'B+', 'AB+', 'O-'],
-    correct_answer: 'O-'
-  },
-  {
-    id: '5',
-    question: 'What is the medical term for high blood pressure?',
-    options: ['Hypotension', 'Hypertension', 'Tachycardia', 'Bradycardia'],
-    correct_answer: 'Hypertension'
-  }
-];
-
-export const BattleGame = ({ roomCode, onGameEnd, onLeave }: BattleGameProps) => {
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+export const BattleGame = ({ roomCode, onGameEnd, onLeave, roomDetails }: BattleGameProps) => {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(15);
+  // FIX: Safely initialize timeLeft using optional chaining and a fallback default
+  const [timeLeft, setTimeLeft] = useState(roomDetails?.time_per_question || 15);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
-  const [gamePhase, setGamePhase] = useState<'playing' | 'result' | 'waiting'>('playing');
-  const [playerCount] = useState(2);
-  const [opponentScore] = useState(0);
+  
+  // FIX: Safely access battle_participants and total_questions with fallbacks
+  const playerCount = roomDetails?.battle_participants?.length || 0;
+  const opponentScore = 0; // This would need real-time data from other players
 
-  const currentQ = mockQuestions[currentQuestion];
-  const totalQuestions = mockQuestions.length;
+  const currentQ = mockQuestions[currentQuestionIndex]; // Still using mockQuestions
+  const totalQuestions = roomDetails?.total_questions || mockQuestions.length; // Use roomDetails for total questions, with fallback
 
   // Timer effect
   useEffect(() => {
-    if (gamePhase !== 'playing' || timeLeft <= 0) return;
+    // If showing result or time's already up, stop current timer
+    if (showResult || timeLeft <= 0) return;
 
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          handleNextQuestion();
-          return 15;
+          clearInterval(timer); // Stop this interval
+          // If no answer selected, treat as incorrect before moving on
+          if (!selectedAnswer) {
+            // No score change for skipped/incorrect
+          }
+          setShowResult(true); // Briefly show result (even if skipped)
+          setTimeout(() => {
+            handleNextQuestion(); // Move to next question after short delay
+          }, 1000); // 1 second delay
+          // FIX: Use optional chaining for roomDetails.time_per_question with a fallback
+          return roomDetails?.time_per_question || 15; // Reset for next question
         }
         return prev - 1;
       });
     }, 1000);
 
+    // Cleanup: clear interval when component unmounts or dependencies change
     return () => clearInterval(timer);
-  }, [gamePhase, timeLeft, currentQuestion]);
+  }, [timeLeft, currentQuestionIndex, showResult, selectedAnswer, roomDetails?.time_per_question]); // Include optional chaining in dependency array
 
   const handleAnswerSelect = (answer: string) => {
-    if (showResult) return;
+    if (showResult) return; // Prevent changing answer after it's been submitted/revealed
     setSelectedAnswer(answer);
   };
 
   const handleSubmit = () => {
-    if (!selectedAnswer) return;
+    if (!selectedAnswer || showResult) return; // Prevent multiple submissions or submission after showing result
     
     const isCorrect = selectedAnswer === currentQ.correct_answer;
     if (isCorrect) {
@@ -96,26 +86,30 @@ export const BattleGame = ({ roomCode, onGameEnd, onLeave }: BattleGameProps) =>
     }
     
     setShowResult(true);
+    // Move to next question after a brief display of the result
     setTimeout(() => {
       handleNextQuestion();
-    }, 2000);
+    }, 1500); // Show result for 1.5 seconds
   };
 
   const handleNextQuestion = () => {
-    if (currentQuestion < totalQuestions - 1) {
-      setCurrentQuestion(prev => prev + 1);
-      setSelectedAnswer(null);
-      setShowResult(false);
-      setTimeLeft(15);
+    setShowResult(false); // Hide previous question's result feedback
+    setSelectedAnswer(null); // Clear selected answer for the new question
+
+    if (currentQuestionIndex < totalQuestions - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      // FIX: Use optional chaining for roomDetails.time_per_question with a fallback
+      setTimeLeft(roomDetails?.time_per_question || 15); // Reset timer for the new question
     } else {
-      // Game ended
+      // Game has ended
       const results = {
         score,
         totalQuestions,
         accuracy: Math.round((score / totalQuestions) * 100),
-        rank: score > opponentScore ? 1 : 2
+        // This 'rank' is a placeholder and would require fetching other players' scores
+        rank: score > opponentScore ? 1 : (score < opponentScore ? 2 : 'Tie') 
       };
-      onGameEnd(results);
+      onGameEnd(results); // Call the onGameEnd prop to transition to results in parent
     }
   };
 
@@ -153,7 +147,7 @@ export const BattleGame = ({ roomCode, onGameEnd, onLeave }: BattleGameProps) =>
                 <div className="text-center">
                   <div className="flex items-center space-x-1">
                     <Target className="w-4 h-4" />
-                    <span>{score}/{currentQuestion + 1}</span>
+                    <span>{score}/{currentQuestionIndex + 1}</span>
                   </div>
                   <p className="text-xs text-white/80">Score</p>
                 </div>
@@ -166,19 +160,19 @@ export const BattleGame = ({ roomCode, onGameEnd, onLeave }: BattleGameProps) =>
         <Card className="mb-6">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Question {currentQuestion + 1} of {totalQuestions}</span>
+              <span className="text-sm font-medium">Question {currentQuestionIndex + 1} of {totalQuestions}</span>
               <span className="text-sm text-gray-500">
-                {Math.round(((currentQuestion + 1) / totalQuestions) * 100)}% Complete
+                {Math.round(((currentQuestionIndex + 1) / totalQuestions) * 100)}% Complete
               </span>
             </div>
-            <Progress value={((currentQuestion + 1) / totalQuestions) * 100} className="h-2" />
+            <Progress value={((currentQuestionIndex + 1) / totalQuestions) * 100} className="h-2" />
           </CardContent>
         </Card>
 
         {/* Question Card */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentQuestion}
+            key={currentQuestionIndex} // Key ensures re-animation on question change
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -215,7 +209,7 @@ export const BattleGame = ({ roomCode, onGameEnd, onLeave }: BattleGameProps) =>
                         key={index}
                         className={buttonClass}
                         onClick={() => handleAnswerSelect(option)}
-                        disabled={showResult}
+                        disabled={showResult} // Disable interaction when showing result
                         whileHover={!showResult ? { scale: 1.01 } : {}}
                         whileTap={!showResult ? { scale: 0.99 } : {}}
                       >

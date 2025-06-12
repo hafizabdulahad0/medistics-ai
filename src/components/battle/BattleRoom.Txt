@@ -14,7 +14,7 @@ interface BattleRoomProps {
   roomId: string;
   userId: string; // The ID of the current logged-in user
   onLeave: () => void;
-  onBattleStart: (roomData: RoomData) => void; // MODIFIED: now passes roomData
+  onBattleStart: () => void; // This will trigger the parent (Battle.tsx) to render BattleGame
 }
 
 // Defines the structure of the room data, including participants, as fetched from Supabase.
@@ -40,19 +40,20 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isLeaving, setIsLeaving] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const prevHostPingRequestedAt = useRef<string | null>(null);
-  const prevHostPingSenderId = useRef<string | null>(null);
-  const [showConfirmLeaveModal, setShowConfirmLeaveModal] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null); // New state for countdown
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold the countdown interval
+  const prevHostPingRequestedAt = useRef<string | null>(null); // Ref to track previous ping timestamp for host toast
+  const prevHostPingSenderId = useRef<string | null>(null); // Ref to track previous ping sender ID for host toast
+  const [showConfirmLeaveModal, setShowConfirmLeaveModal] = useState(false); // State for confirmation modal
 
+
+  // useRef to store the previous count of participants for join/leave notifications
   const prevParticipantsCount = useRef<number | null>(null);
 
   // --- Fetch room details and participants in real-time ---
   const { data: room, isLoading: roomLoading, error: roomError } = useQuery<RoomData>({
     queryKey: ['battleRoom', roomId],
     queryFn: async () => {
-      console.log('useQuery: Fetching battle room for roomId:', roomId);
       const { data, error } = await supabase
         .from('battle_rooms')
         .select(`
@@ -68,30 +69,18 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         .single();
 
       if (error) {
-        console.error("Supabase Error fetching battle room in queryFn:", error);
+        console.error("Supabase Error fetching battle room:", error);
         throw error;
       }
-      console.log('useQuery: Successfully fetched room data:', data);
       return data as RoomData;
     },
     refetchInterval: 3000,
     enabled: !!roomId,
-    onSuccess: (data) => {
-      console.log('useQuery onSuccess: Room data received:', data);
-    },
-    onError: (err) => {
-      console.error('useQuery onError: Error fetching room data:', err);
-    }
   });
 
   // --- Real-time subscription for participants and room status ---
   useEffect(() => {
-    if (!roomId) {
-      console.log('Realtime Subscriptions: roomId is null, skipping subscriptions.');
-      return;
-    }
-
-    console.log('Realtime Subscriptions: Setting up channels for roomId:', roomId);
+    if (!roomId) return;
 
     const participantChannel = supabase
       .channel(`battle_room_${roomId}_participants`)
@@ -104,8 +93,8 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
           filter: `battle_room_id=eq.${roomId}`
         },
         (payload) => {
-          console.log('Realtime participant change detected:', payload);
           queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
+          console.log('Realtime participant change detected:', payload);
         }
       )
       .subscribe();
@@ -121,19 +110,17 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
           filter: `id=eq.${roomId}`
         },
         (payload) => {
-          console.log('Realtime room status change detected:', payload);
           queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
           const updatedRoom = payload.new as RoomData;
           if (updatedRoom.status === 'in_progress') {
-            console.log("Realtime: Room status changed to 'in_progress'. Starting battle...");
+            console.log("Room status changed to 'in_progress'. Starting battle...");
+            // Ensure any running countdown is cleared if the game starts through other means
             if (countdownTimerRef.current) {
               clearInterval(countdownTimerRef.current);
               countdownTimerRef.current = null;
-              console.log('Realtime: Cleared countdown timer due to status change.');
             }
-            onBattleStart(updatedRoom);
+            onBattleStart();
           } else if (updatedRoom.status === 'completed') {
-            console.log("Realtime: Room status changed to 'completed'. Leaving room.");
             onLeave();
             toast({
               title: "Room Closed",
@@ -145,136 +132,89 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
       )
       .subscribe();
 
-    console.log('Realtime Subscriptions: Channels subscribed.');
-
     return () => {
-      console.log('Realtime Subscriptions: Cleaning up channels.');
       supabase.removeChannel(participantChannel);
       supabase.removeChannel(roomStatusChannel);
+      // Clean up countdown timer on unmount
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
-        console.log('Realtime Subscriptions: Cleared countdown timer on unmount/cleanup.');
       }
     };
   }, [roomId, queryClient, onBattleStart, onLeave, toast]);
 
   // --- Effect to manage countdown when room is full or manually started ---
   useEffect(() => {
-    console.log('Countdown Effect: Re-evaluating. Current room state:', room?.status, 'countdown_initiated_at:', room?.countdown_initiated_at);
-    
-    if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
-        console.log('Countdown Effect: Cleared existing interval.');
-    }
-
-    if (!room || room.status === 'in_progress') {
-        console.log('Countdown Effect: No room data or room is in progress. Setting countdown to null and returning.');
-        setCountdown(null);
-        return;
-    }
+    if (!room) return;
 
     const currentPlayers = room.battle_participants?.length || 0;
     const isRoomFull = currentPlayers === room.max_players;
     const isWaitingStatus = room.status === 'waiting';
-    const isCountdownInitiatedByDB = room.countdown_initiated_at !== null;
+    const isCountdownInitiatedByDB = room.countdown_initiated_at !== null; // Renamed to avoid conflict
 
-    console.log('Countdown Effect: Conditions - isWaitingStatus:', isWaitingStatus, 'isRoomFull:', isRoomFull, 'isCountdownInitiatedByDB:', isCountdownInitiatedByDB);
+    // Condition to start the countdown
+    if ((isRoomFull && isWaitingStatus) || (isCountdownInitiatedByDB && isWaitingStatus)) {
+      if (countdownTimerRef.current === null) {
+        // Calculate initial countdown based on battle type
+        const initialCountdownDuration = room.battle_type === '1v1' ? 5 : 10;
 
-    if (isWaitingStatus && (isRoomFull || isCountdownInitiatedByDB)) {
-      const initialCountdownDuration = room.battle_type === '1v1' ? 5 : 10;
-      let calculatedTimeRemaining = initialCountdownDuration;
-
-      if (isCountdownInitiatedByDB && room.countdown_initiated_at) {
-        const timeElapsed = (new Date().getTime() - new Date(room.countdown_initiated_at).getTime()) / 1000;
-        calculatedTimeRemaining = Math.max(0, initialCountdownDuration - Math.floor(timeElapsed));
-        console.log('Countdown Effect: Time elapsed:', timeElapsed, 'Calculated time remaining:', calculatedTimeRemaining);
-      }
-
-      if (countdown === null || countdown !== calculatedTimeRemaining) {
-        setCountdown(calculatedTimeRemaining);
-        console.log('Countdown Effect: Initial countdown set to:', calculatedTimeRemaining);
-      }
-      
-      if (calculatedTimeRemaining <= 0) {
-        console.log('Countdown Effect: Calculated time remaining is <= 0. Attempting to start battle directly.');
-        if (room.status === 'waiting') {
-            const updateStatus = async () => {
-              console.log('Countdown Effect: Calling updateStatus to set room in_progress (time expired).');
-              const { error } = await supabase
-                .from('battle_rooms')
-                .update({ status: 'in_progress', countdown_initiated_at: null })
-                .eq('id', roomId);
-              if (error) {
-                console.error('Error updating room status to in_progress (time expired):', error);
-                toast({
-                  title: "Error",
-                  description: "Failed to start battle automatically.",
-                  variant: "destructive",
-                });
-              } else {
-                console.log('Countdown Effect: Database update success (time expired). Invalidating queries.');
-                queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
-              }
-            };
-            updateStatus();
+        // If countdown was just initiated or resumed (after being paused),
+        // calculate remaining time, otherwise use the initial duration.
+        let timeRemaining = initialCountdownDuration;
+        if (room.countdown_initiated_at) {
+          const timeElapsed = (new Date().getTime() - new Date(room.countdown_initiated_at).getTime()) / 1000;
+          timeRemaining = Math.max(0, initialCountdownDuration - Math.floor(timeElapsed));
         }
-        return;
-      }
 
-      if (calculatedTimeRemaining > 0 && countdownTimerRef.current === null) {
-        console.log('Countdown Effect: Starting new interval for countdown. Initial value:', calculatedTimeRemaining);
-        countdownTimerRef.current = setInterval(() => {
+        setCountdown(timeRemaining);
+
+        if (timeRemaining <= 0) { // If time already ran out, directly set status
+             if (countdownTimerRef.current) {
+               clearInterval(countdownTimerRef.current);
+               countdownTimerRef.current = null;
+             }
+             const updateStatus = async () => {
+               const { error } = await supabase
+                 .from('battle_rooms')
+                 .update({ status: 'in_progress', countdown_initiated_at: null }) // Clear countdown_initiated_at
+                 .eq('id', roomId);
+               if (error) {
+                 console.error('Error updating room status to in_progress:', error);
+                 toast({
+                   title: "Error",
+                   description: "Failed to start battle automatically.",
+                   variant: "destructive",
+                 });
+               }
+             };
+             updateStatus();
+             return;
+        }
+
+
+        countdownTimerRef.current = setInterval(async () => {
           setCountdown(prev => {
-            if (prev === null) {
-              if (countdownTimerRef.current) {
-                clearInterval(countdownTimerRef.current);
-                countdownTimerRef.current = null;
-                console.log('Countdown Interval: prev is null, cleared interval.');
-              }
-              return null;
-            }
-  
-            const currentRoomState = queryClient.getQueryData(['battleRoom', roomId]) as RoomData | undefined;
-            console.log('Countdown Interval: Tick. prev:', prev, 'Current cached room status:', currentRoomState?.status);
-  
-            if (currentRoomState?.status === 'in_progress') {
-              console.log('Countdown Interval: Cached room status is in_progress. Clearing interval.');
-              if (countdownTimerRef.current) {
-                clearInterval(countdownTimerRef.current);
-                countdownTimerRef.current = null;
-              }
-              return null;
-            }
-  
+            if (prev === null) return null;
             if (prev <= 1) {
-              console.log('Countdown Interval: Reached 0 or 1. Attempting status update.');
               if (countdownTimerRef.current) {
                 clearInterval(countdownTimerRef.current);
                 countdownTimerRef.current = null;
               }
-              if (currentRoomState?.status === 'waiting') {
-                  const updateStatus = async () => {
-                    console.log('Countdown Interval: Calling updateStatus to set room in_progress (countdown end).');
-                    const { error } = await supabase
-                      .from('battle_rooms')
-                      .update({ status: 'in_progress', countdown_initiated_at: null })
-                      .eq('id', roomId);
-                    if (error) {
-                      console.error('Error updating room status to in_progress (countdown end):', error);
-                      toast({
-                        title: "Error",
-                        description: "Failed to start battle automatically.",
-                        variant: "destructive",
-                      });
-                    } else {
-                      console.log('Countdown Interval: Database update success (countdown end). Invalidating queries.');
-                      queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
-                    }
-                  };
-                  updateStatus();
-              }
+              const updateStatus = async () => {
+                const { error } = await supabase
+                  .from('battle_rooms')
+                  .update({ status: 'in_progress', countdown_initiated_at: null }) // Clear countdown_initiated_at
+                  .eq('id', roomId);
+                if (error) {
+                  console.error('Error updating room status to in_progress:', error);
+                  toast({
+                    title: "Error",
+                    description: "Failed to start battle automatically.",
+                    variant: "destructive",
+                  });
+                }
+              };
+              updateStatus();
               return 0;
             }
             return prev - 1;
@@ -282,7 +222,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         }, 1000);
       }
     } else {
-      console.log('Countdown Effect: Conditions not met. Clearing interval and resetting countdown state.');
+      // If conditions for countdown are not met, clear any running countdown
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
@@ -293,13 +233,13 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     }
 
     return () => {
-      console.log('Countdown Effect Cleanup: Clearing interval on unmount/dependency change.');
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
       }
     };
-  }, [room, roomId, toast, queryClient, countdown]);
+  }, [room, roomId, onBattleStart, toast]);
+
 
   // --- Effect for Join/Leave Toast Notifications and Kicking Removed Players ---
   useEffect(() => {
@@ -308,10 +248,12 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     const currentPlayers = room.battle_participants?.length || 0;
     const isHost = room.host_id === userId;
 
+    // Handle toast notifications for other players joining/leaving
     if (prevParticipantsCount.current !== null && prevParticipantsCount.current !== currentPlayers) {
       const oldParticipants = (queryClient.getQueryData(['battleRoom', roomId]) as RoomData)?.battle_participants || [];
 
       if (currentPlayers > prevParticipantsCount.current) {
+        // Find the newly joined player's username
         const newlyJoined = room.battle_participants.find(p => !oldParticipants.some(op => op.user_id === p.user_id));
         if (newlyJoined) {
           toast({
@@ -320,6 +262,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
           });
         }
       } else if (currentPlayers < prevParticipantsCount.current) {
+        // Find the player who left/was removed
         const removed = oldParticipants.find(p => !room.battle_participants?.some(np => np.user_id === p.user_id));
         if (removed) {
           toast({
@@ -329,30 +272,37 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         }
       }
     }
-    prevParticipantsCount.current = currentPlayers;
+    prevParticipantsCount.current = currentPlayers; // Update the ref for the next render
 
+    // --- Redirect removed player ---
+    // Check if the current user is still in the room's participant list
     const currentUserIsParticipant = room.battle_participants?.some(
       (participant) => participant.user_id === userId
     );
 
+    // If the current user is NOT a participant and is NOT the host (who initiated the removal),
+    // then they should be redirected back to the lobby.
+    // Also, ensure we don't redirect if the user is in the process of leaving voluntarily.
     if (!currentUserIsParticipant && !isHost && !isLeaving) {
       toast({
         title: "Kicked from Room",
         description: "You have been removed from this battle room.",
         variant: "destructive",
       });
-      onLeave();
+      onLeave(); // Redirect to lobby
     }
   }, [room, userId, onLeave, toast, queryClient, isLeaving]);
 
   // --- Effect for Host Ping Notification ---
   useEffect(() => {
-    if (!room || room.host_id !== userId) return;
+    if (!room || room.host_id !== userId) return; // Only for the host
 
+    // Check if host_ping_requested_at or last_ping_sender_id has changed
+    // to trigger a toast for the host
     if (room.host_ping_requested_at &&
         (room.host_ping_requested_at !== prevHostPingRequestedAt.current ||
          room.last_ping_sender_id !== prevHostPingSenderId.current)) {
-      const senderName = room.last_ping_sender_username || "A participant";
+      const senderName = room.last_ping_sender_username || "A participant"; // Use the stored sender username
       toast({
         title: "Ping Received!",
         description: `${senderName} wants to start the battle!`,
@@ -363,10 +313,11 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
     prevHostPingSenderId.current = room.last_ping_sender_id;
   }, [room, userId, toast]);
 
+
   // --- Leave Room Mutation ---
   const leaveRoomMutation = useMutation({
     mutationFn: async () => {
-      setIsLeaving(true);
+      setIsLeaving(true); // Set leaving state to true to prevent premature redirect
       const { error } = await supabase
         .from('battle_participants')
         .delete()
@@ -378,11 +329,13 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         throw error;
       }
     },
-    onSuccess: async () => {
+    onSuccess: async () => { // Marked as async to allow awaiting status update
+      // Before redirecting, handle host migration if the leaving user is the host
       if (room && room.host_id === userId) {
         const remainingParticipants = room.battle_participants?.filter(p => p.user_id !== userId);
 
         if (remainingParticipants && remainingParticipants.length > 0) {
+          // Find the earliest joined remaining participant to be the new host
           const newHost = remainingParticipants.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
           console.log(`Host ${room.host_id} left. New host is ${newHost.user_id}`);
 
@@ -405,26 +358,31 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
             });
           }
         } else {
+          // If no participants left, the room might ideally be cleaned up or closed.
+          // For now, no host transfer happens if the host is the last one.
           console.log("Host left, no remaining participants to transfer host to.");
         }
       }
 
       toast({ title: "Left Room", description: "You have left the battle room." });
 
+      // Check if room needs to revert to 'waiting' status
       const updatedRoom = queryClient.getQueryData(['battleRoom', roomId]) as RoomData;
+      // Only revert if the room is currently 'in_progress' but now has fewer than max_players
       if (updatedRoom && updatedRoom.status === 'in_progress' && (updatedRoom.battle_participants?.length || 0) <= updatedRoom.max_players) {
-        const newParticipantCount = (updatedRoom.battle_participants?.length || 0) - 1;
+        // Recalculate if room is full based on updated participant count after one left
+        const newParticipantCount = (updatedRoom.battle_participants?.length || 0) - 1; // Assuming one just left
         if (newParticipantCount < updatedRoom.max_players) {
           const { error: statusUpdateError } = await supabase
             .from('battle_rooms')
-            .update({ status: 'waiting', countdown_initiated_at: null })
+            .update({ status: 'waiting', countdown_initiated_at: null }) // Also clear countdown_initiated_at
             .eq('id', roomId);
           if (statusUpdateError) {
             console.error("Error reverting room status to waiting:", statusUpdateError);
           }
         }
       }
-      onLeave();
+      onLeave(); // Redirect to lobby
     },
     onError: (error: any) => {
       console.error('Error leaving room:', error);
@@ -433,7 +391,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         description: `Failed to leave room: ${error.message}`,
         variant: "destructive"
       });
-      setIsLeaving(false);
+      setIsLeaving(false); // Reset button state if leaving failed
     }
   });
 
@@ -458,20 +416,23 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         throw error;
       }
     },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] });
+    onSuccess: async () => { // Marked as async to allow awaiting status update
+      queryClient.invalidateQueries({ queryKey: ['battleRoom', roomId] }); // Refresh participant list
       toast({ title: "Participant Removed", description: "A participant has been removed from the room." });
 
+      // After a participant is removed, check if the room needs to revert to 'waiting' status
       const updatedRoom = queryClient.getQueryData(['battleRoom', roomId]) as RoomData;
+      // Only revert if the room is currently 'in_progress' but now has fewer than max_players
       if (updatedRoom && updatedRoom.status === 'in_progress' && (updatedRoom.battle_participants?.length || 0) <= updatedRoom.max_players) {
-        const newParticipantCount = (updatedRoom.battle_participants?.length || 0) - 1;
+        // Recalculate if room is full based on updated participant count after one left
+        const newParticipantCount = (updatedRoom.battle_participants?.length || 0) - 1; // Assuming one just left
         if (newParticipantCount < updatedRoom.max_players) {
           const { error: statusUpdateError } = await supabase
             .from('battle_rooms')
-            .update({ status: 'waiting', countdown_initiated_at: null })
+            .update({ status: 'waiting', countdown_initiated_at: null }) // Also clear countdown_initiated_at
             .eq('id', roomId);
           if (statusUpdateError) {
-            console.error("Error reverting room status to waiting:", statusUpdateError);
+            console.error("Error reverting room status to waiting after removal:", statusUpdateError);
           }
         }
       }
@@ -498,11 +459,12 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         throw new Error("Battle can only be started from 'waiting' status.");
       }
 
-      console.log('startBattleMutation: Initiating countdown by updating countdown_initiated_at.');
+      // Instead of directly setting status to 'in_progress', initiate the countdown
       const { error } = await supabase
         .from('battle_rooms')
         .update({
-          countdown_initiated_at: new Date().toISOString(),
+          countdown_initiated_at: new Date().toISOString(), // Signal to start countdown
+          // Clear any pending ping requests if host starts battle
           host_ping_requested_at: null,
           last_ping_sender_id: null,
           last_ping_sender_username: null,
@@ -513,16 +475,15 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
         console.error("Supabase Error initiating countdown manually:", error);
         throw error;
       }
+      // The useEffect listening for countdown_initiated_at will now start the countdown
     },
     onSuccess: () => {
-      console.log('startBattleMutation: Countdown initiated successfully.');
       toast({
         title: "Starting Battle!",
         description: "The host has initiated the battle countdown.",
       });
     },
     onError: (error: any) => {
-      console.error('startBattleMutation onError:', error);
       toast({
         title: "Error Starting Battle",
         description: `Failed to start battle: ${error.message}`,
@@ -534,25 +495,25 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   // New: Mutation for participants to ping the host
   const pingHostMutation = useMutation({
     mutationFn: async () => {
-      if (!room || room.host_id === userId) {
+      if (!room || room.host_id === userId) { // Can't ping if you are the host
         throw new Error("Invalid action: cannot ping host or not in a room.");
       }
-      if (room.battle_type !== 'ffa') {
+      if (room.battle_type !== 'ffa') { // Only allow ping in FFA mode
         throw new Error("Pinging host is only available in FFA mode.");
       }
       if (room.status !== 'waiting') {
         throw new Error("Cannot ping host once battle has started.");
       }
 
+      // Get the sender's username from the current room data
       const senderUsername = room.battle_participants.find(p => p.user_id === userId)?.username || 'A participant';
 
-      console.log('pingHostMutation: Pinging host.');
       const { error } = await supabase
         .from('battle_rooms')
         .update({
           host_ping_requested_at: new Date().toISOString(),
-          last_ping_sender_id: userId,
-          last_ping_sender_username: senderUsername
+          last_ping_sender_id: userId, // Store the ID of the sender
+          last_ping_sender_username: senderUsername // Store the username of the sender
         })
         .eq('id', roomId);
 
@@ -562,14 +523,12 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
       }
     },
     onSuccess: () => {
-      console.log('pingHostMutation: Ping sent successfully.');
       toast({
         title: "Ping Sent!",
         description: "Host has been notified to start the battle.",
       });
     },
     onError: (error: any) => {
-      console.error('pingHostMutation onError:', error);
       toast({
         title: "Error Pinging Host",
         description: `Failed to send ping: ${error.message}`,
@@ -577,6 +536,7 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
       });
     }
   });
+
 
   // Function to copy room code to clipboard
   const handleCopyRoomCode = () => {
@@ -604,22 +564,24 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   };
 
   const handleLeaveClick = () => {
-    const isHost = room?.host_id === userId;
+    // If current user is host, show confirmation modal
     if (isHost) {
       setShowConfirmLeaveModal(true);
     } else {
+      // Otherwise, directly trigger the leave mutation
       leaveRoomMutation.mutate();
     }
   };
 
   const confirmLeave = () => {
-    setShowConfirmLeaveModal(false);
-    leaveRoomMutation.mutate();
+    setShowConfirmLeaveModal(false); // Close the modal
+    leaveRoomMutation.mutate(); // Trigger the leave mutation
   };
 
   const cancelLeave = () => {
-    setShowConfirmLeaveModal(false);
+    setShowConfirmLeaveModal(false); // Close the modal
   };
+
 
   // --- Render logic for loading, error, and main waiting room UI ---
   if (roomLoading) {
@@ -632,12 +594,11 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   }
 
   if (roomError || !room) {
-    console.error('Render Error: Room data not available or error occurred:', roomError);
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-red-900/20 dark:via-orange-900/20 dark:to-yellow-900/20 p-4 text-center">
         <XCircle className="h-16 w-16 text-red-500 mb-4" />
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Error Loading Room</h2>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">{roomError?.message || "Room not found or accessible. Check RLS policies."}</p>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">{roomError?.message || "Room not found or accessible."}</p>
         <Button onClick={onLeave} className="mt-6 bg-red-600 hover:bg-red-700 text-white">
           Back to Lobby
         </Button>
@@ -648,7 +609,8 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
   const currentPlayers = room.battle_participants?.length || 0;
   const isRoomFull = currentPlayers === room.max_players;
   const isGameStarting = room.status === 'in_progress';
-  const isHost = room.host_id === userId;
+  const isHost = room.host_id === userId; // Determine if current user is the host
+  // Define isCountdownInitiated correctly here
   const isCountdownInitiated = room.countdown_initiated_at !== null;
 
 
@@ -751,11 +713,12 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
                   )}
                 </Badge>
               ))}
+              {/* Removed placeholder badges for empty slots */}
             </div>
           </div>
 
           {/* Messages based on room status and countdown */}
-          {countdown !== null && room.status === 'waiting' && countdown > 0 ? (
+          {countdown !== null && room.status === 'waiting' ? (
             <div className="text-center text-lg font-semibold text-green-600 dark:text-green-400 animate-pulse">
               Battle starting in {countdown} seconds!
             </div>
@@ -769,11 +732,12 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
             </div>
           ) : null}
 
+
           {/* Host Start Battle Button (FFA only) */}
           {isHost && room.battle_type === 'ffa' && room.status === 'waiting' && currentPlayers > 1 && !isCountdownInitiated && (
             <Button
               onClick={() => startBattleMutation.mutate()}
-              disabled={startBattleMutation.isPending || currentPlayers < 2}
+              disabled={startBattleMutation.isPending || currentPlayers < 2} // Require at least 2 players to start FFA
               className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg flex items-center justify-center space-x-2"
             >
               {startBattleMutation.isPending ? (
@@ -787,8 +751,8 @@ export const BattleRoom = ({ roomId, userId, onLeave, onBattleStart }: BattleRoo
 
           {/* Leave Button */}
           <Button
-            onClick={handleLeaveClick}
-            disabled={leaveRoomMutation.isPending}
+            onClick={handleLeaveClick} // Use the new handler
+            disabled={leaveRoomMutation.isPending} // Only disable if the leave mutation is in progress
             variant="outline"
             className="w-full border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
           >
