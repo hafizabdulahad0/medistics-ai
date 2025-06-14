@@ -87,7 +87,7 @@ const Checkout = () => {
   };
 
   const handlePaymentDone = () => {
-    window.open('https://forms.gle/fBx4EQG7MvZLkA8N9', '_blank');
+    window.open('https://docs.google.com/forms/d/e/1FAIpQLSc67DrKM0JfQ1fnwuqr3aUXFopKnLyD6d3ru79nmXHS9uQ5MA/viewform?usp=header', '_blank');
   };
 
   return (
