@@ -14,6 +14,7 @@ import AIChatbotPage from '@/pages/AIChatbot';
 import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
 import Admin2 from '@/pages/Admin2';
+import Admin3 from '@/pages/Admin3';
 import Profile from '@/pages/Profile';
 import Pricing from '@/pages/Pricing';
 import Checkout from '@/pages/Checkout';
@@ -21,6 +22,7 @@ import NotFound from '@/pages/NotFound';
 import ChangePassword from '@/pages/ChangePassword';
 import MockTest from '@/pages/MockTest';
 import TestCompletionPage from '@/pages/TestCompletion'; // Import the new TestCompletionPage
+import Classroom from '@/pages/Classroom'; // Import the new TestCompletionPage
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -50,6 +52,7 @@ function App() {
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin2" element={<Admin2 />} />
+              <Route path="/admin3" element={<Admin3 />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/password" element={<ChangePassword />} />
               <Route path="/profile/upgrade" element={<Profile />} />
@@ -57,6 +60,7 @@ function App() {
               <Route path="/mock-test" element={<MockTest />} />
               <Route path="/test-completed" element={<TestCompletionPage />} /> {/* New route for TestCompletionPage */}
               <Route path="/checkout" element={<Checkout />} />
+              <Route path="/classroom" element={<Classroom />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Toaster />

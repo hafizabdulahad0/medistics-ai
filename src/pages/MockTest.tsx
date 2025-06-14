@@ -31,6 +31,59 @@ const MockTest = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showUnattemptedDialog, setShowUnattemptedDialog] = useState(false);
   const [unattemptedCount, setUnattemptedCount] = useState(0);
+  const [userPlan, setUserPlan] = useState<string | null>(null); // New state for user plan
+
+  // Define plan color schemes
+  const planColors = {
+    'free': {
+      light: 'bg-purple-100 text-purple-800 border-purple-300',
+      dark: 'dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700'
+    },
+    'premium': {
+      light: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      dark: 'dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-700'
+    },
+    'pro': {
+      light: 'bg-green-100 text-green-800 border-green-300',
+      dark: 'dark:bg-green-900/30 dark:text-green-200 dark:border-green-700'
+    },
+    // Add more plans as needed
+    'default': { // Fallback for unknown plans
+      light: 'bg-gray-100 text-gray-800 border-gray-300',
+      dark: 'dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+    }
+  };
+
+  // Function to get plan badge classes
+  const getPlanBadgeClasses = (plan: string) => {
+    const colors = planColors[plan as keyof typeof planColors] || planColors.default;
+    return `${colors.light} ${colors.dark}`;
+  };
+
+  // Fetch user's plan on component mount or when user changes
+  useEffect(() => {
+    const fetchUserPlan = async () => {
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user plan:', error);
+          setUserPlan('default'); // Fallback to default if there's an error
+        } else if (data) {
+          setUserPlan(data.plan);
+        }
+      } else {
+        setUserPlan(null); // Clear plan if user logs out
+      }
+    };
+
+    fetchUserPlan();
+  }, [user]); // Dependency array: re-run when `user` object changes
+
 
   // Define test unlock and end times
   // IMPORTANT: Set these dates/times in PKT (Pakistan Standard Time)
@@ -387,14 +440,14 @@ const MockTest = () => {
                 </div>
               </SheetContent>
             </Sheet>
-            
+
             <Link to="/dashboard" className="text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition-colors hidden lg:inline-flex items-center">
                 <ChevronLeft className="w-6 h-6 mr-2 inline-block" />
                 <span className="text-xl font-bold">Mock Test</span>
             </Link>
              <span className="text-xl font-bold text-gray-900 dark:text-white lg:hidden">Mock Test</span> {/* Title for mobile */}
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
@@ -408,9 +461,16 @@ const MockTest = () => {
                 <Moon className="h-4 w-4" />
               )}
             </Button>
-            <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700">
-              Free Plan
-            </Badge>
+            {/* Dynamically rendered user plan badge */}
+            {userPlan ? (
+              <Badge className={getPlanBadgeClasses(userPlan)}>
+                {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} Plan
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="hidden sm:block bg-gray-100 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600 text-xs">
+                Loading Plan...
+              </Badge>
+            )}
             <ProfileDropdown />
           </div>
         </div>

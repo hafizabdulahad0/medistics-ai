@@ -2,13 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, X } from 'lucide-react';
+import { Moon, Sun, X, ArrowLeft } from 'lucide-react'; // Import ArrowLeft icon
+import { useQuery } from '@tanstack/react-query'; // Import useQuery
+import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
+import { Input } from '@/components/ui/input'; // Assuming you have a reusable Input component
 
 // Define interfaces for better type safety
 interface Question {
@@ -102,6 +105,62 @@ const AITestGenerator: React.FC = () => {
     const { user, isLoading: isAuthLoading } = useAuth();
     const { theme, setTheme } = useTheme();
 
+    // Get user profile data
+    const { data: profile, isLoading: isProfileLoading } = useQuery({
+        queryKey: ['profile', user?.id],
+        queryFn: async () => {
+            if (!user?.id) return null;
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (error) {
+                console.error('Error fetching profile:', error);
+                return null;
+            }
+            return data;
+        },
+        enabled: !!user?.id
+    });
+
+    // Define plan color schemes
+    const planColors = {
+        'free': {
+            light: 'bg-purple-100 text-purple-800 border-purple-300',
+            dark: 'dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700'
+        },
+        'premium': {
+            light: 'bg-pink-100 text-pink-800 border-pink-300', // Adjusted to pink for premium
+            dark: 'dark:bg-pink-900/30 dark:text-pink-200 dark:border-pink-700'
+        },
+        'pro': { // Keeping 'pro' for potential future use or consistency with backend, but not in UI text
+            light: 'bg-green-100 text-green-800 border-green-300',
+            dark: 'dark:bg-green-900/30 dark:text-green-200 dark:border-green-700'
+        },
+        'iconic': { // Added iconic plan color scheme
+            light: 'bg-blue-100 text-blue-800 border-blue-300',
+            dark: 'dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
+        },
+        'default': { // Fallback for unknown plans
+            light: 'bg-gray-100 text-gray-800 border-gray-300',
+            dark: 'dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+        }
+    };
+
+    // Determine the user's plan and its display name
+    const rawUserPlan = profile?.plan?.toLowerCase() || 'free'; // Ensure lowercase for lookup
+    const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
+
+    // Get the color classes for the current plan
+    const currentPlanColorClasses = planColors[rawUserPlan] || planColors['default'];
+
+    // Check if the user has access to this feature
+    // Available for 'premium' and 'iconic' users
+    const hasAccess = rawUserPlan === 'premium' || rawUserPlan === 'iconic';
+
+
     // State for generated questions and test flow
     const [allGeneratedQuestions, setAllGeneratedQuestions] = useState<Question[] | null>(null);
     const [currentQuestionDisplayIndex, setCurrentQuestionDisplayIndex] = useState(0);
@@ -124,11 +183,11 @@ const AITestGenerator: React.FC = () => {
     // State for AI Warning visibility - only show when test has started
     const [showAiWarning, setShowAiWarning] = useState(false); // Initial state is false
 
-    // --- Authentication Fallback (from Dashboard) ---
-    if (isAuthLoading) {
+    // --- Authentication Fallback ---
+    if (isAuthLoading || isProfileLoading) { // Include profile loading in this check
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-purple-50/30 to-pink-50/30 dark:bg-gradient-to-br dark:from-gray-900 dark:via-purple-900/10 dark:to-pink-900/10 text-gray-900 dark:text-white">
-                <p>Loading user session...</p>
+                <p>Loading user session and profile...</p>
             </div>
         );
     }
@@ -327,6 +386,17 @@ const AITestGenerator: React.FC = () => {
             <header className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-purple-200 dark:border-purple-800 sticky top-0 z-50">
                 <div className="container mx-auto px-4 lg:px-8 py-4 flex justify-between items-center">
                     <div className="flex items-center space-x-3">
+                        {/* Back arrow button */}
+                        <Link to="/dashboard" className="mr-3">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200"
+                                aria-label="Back to Dashboard"
+                            >
+                                <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-white" />
+                            </Button>
+                        </Link>
                         <img
                             src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
                             alt="Medistics Logo"
@@ -348,8 +418,12 @@ const AITestGenerator: React.FC = () => {
                                 <Moon className="h-4 w-4 text-gray-700 dark:text-white" />
                             )}
                         </Button>
-                        <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700">
-                            Free Plan
+                        {/* Dynamic Plan Badge with dynamic colors */}
+                        <Badge
+                            variant="secondary"
+                            className={`${currentPlanColorClasses.light} ${currentPlanColorClasses.dark}`}
+                        >
+                            {userPlanDisplayName}
                         </Badge>
                         <ProfileDropdown />
                     </div>
@@ -359,186 +433,232 @@ const AITestGenerator: React.FC = () => {
             <div className="container mx-auto px-4 lg:px-8 py-8">
                 {error && <div className="text-red-500 bg-red-100 p-3 rounded mb-4">{error}</div>}
 
-                {/* AI can make mistakes warning - Only show when a test has started */}
-                {(showAiWarning && allGeneratedQuestions) && (
-                    <div className="mb-6 p-4 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center justify-between space-x-3">
-                        <div className="flex items-center space-x-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6 flex-shrink-0">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.174 3.35 1.9 3.35h13.713c1.726 0 2.766-1.85 1.9-3.35L13.723 3.545c-.892-1.547-3.033-1.547-3.925 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                            </svg>
-                            <p className="text-sm font-medium">
-                                Please be advised: While our AI aims for accuracy, content generated by artificial intelligence may occasionally contain inaccuracies or omissions. We recommend cross-referencing information for critical study.
-                            </p>
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowAiWarning(false)}
-                            className="w-8 h-8 p-0 flex-shrink-0 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-200/50 dark:hover:bg-yellow-800/50"
-                            aria-label="Close warning"
-                        >
-                            <X className="w-4 h-4" />
-                        </Button>
-                    </div>
-                )}
-
-
-                {!allGeneratedQuestions ? (
-                    <TestGenerationForm onGenerate={handleGenerateTest} loading={loading} />
-                ) : (
-                    <Card className="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-10 max-w-4xl mx-auto my-16 border-2 border-purple-200 dark:border-purple-700">
-                        <CardHeader className="text-center mb-6">
-                            <CardTitle className="text-3xl font-bold text-purple-700 dark:text-purple-400 mb-2">
-                                Question {currentQuestionDisplayIndex + 1} of {requestedTotalQuestions}
+                {/* Conditional rendering based on user plan */}
+                {!hasAccess ? (
+                    <Card className="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-6 max-w-xl mx-auto my-16 border-2 border-purple-200 dark:border-purple-700 text-center">
+                        <CardHeader className="mb-4 flex flex-col items-center">
+                            <img
+                                src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
+                                alt="Medistics Logo"
+                                className="w-32 h-32 object-contain mx-auto mb-6"
+                            />
+                            <CardTitle className="text-3xl font-extrabold text-purple-700 dark:text-purple-400">
+                                Exclusive Feature
                             </CardTitle>
                         </CardHeader>
-
-                        {currentQuestion && (
-                            <CardContent className="mb-8 p-6 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-700">
-                                <p className="font-bold text-xl mb-3 text-gray-900 dark:text-white">
-                                    {currentQuestionDisplayIndex + 1}. {currentQuestion.question}
-                                </p>
-                                <div className="space-y-2">
-                                    {currentQuestion.options.map((option, optIndex) => {
-                                        const isSelected = userAnswers[currentQuestionDisplayIndex] === option;
-                                        const isCorrect = option === currentQuestion.answer;
-                                        const hasAnswered = isCurrentQuestionAnswered; // Using the new derived state for per-question check
-
-                                        let optionClassName = `flex items-center p-2 rounded cursor-pointer transition-colors duration-200 `;
-
-                                        if (hasAnswered) {
-                                            if (isSelected && isCorrect) {
-                                                optionClassName += 'bg-green-100 dark:bg-green-900/30 font-bold text-green-800 dark:text-green-200';
-                                            } else if (isSelected && !isCorrect) {
-                                                optionClassName += 'bg-red-100 dark:bg-red-900/30 font-bold text-red-800 dark:text-red-200';
-                                            } else if (isCorrect) {
-                                                optionClassName += 'bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600';
-                                            } else {
-                                                optionClassName += 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600';
-                                            }
-                                        } else {
-                                            // Before answering, only highlight on hover/selection
-                                            optionClassName += `${isSelected ? 'bg-purple-100 dark:bg-purple-900/30 border border-purple-400 dark:border-purple-600' : 'bg-gray-50 dark:bg-gray-700'} hover:bg-gray-100 dark:hover:bg-gray-600`;
-                                        }
-
-                                        return (
-                                            <label key={optIndex} className={optionClassName}>
-                                                <input
-                                                    type="radio"
-                                                    name={`question-${currentQuestionDisplayIndex}`}
-                                                    value={option}
-                                                    checked={isSelected}
-                                                    onChange={() => handleAnswerChange(currentQuestionDisplayIndex, option)}
-                                                    className="mr-2 accent-purple-600 dark:accent-purple-400"
-                                                    disabled={hasAnswered || testSubmitted} // Disable once answered or test submitted
-                                                />
-                                                <span className={`text-gray-800 dark:text-gray-200 ${hasAnswered && isCorrect ? 'font-bold' : ''}`}>
-                                                    {option}
-                                                </span>
-                                            </label>
-                                        );
-                                    })}
+                        <CardContent>
+                            <p className="text-gray-700 dark:text-gray-300 mb-6 text-lg">
+                                The AI Test Generator is an exclusive feature available only with the{' '}
+                                <span className={`font-semibold ${planColors.premium.light.includes('text-') ? planColors.premium.light.split(' ').find(cls => cls.startsWith('text-')) : 'text-pink-800'} ${planColors.premium.dark.includes('text-') ? planColors.premium.dark.split(' ').find(cls => cls.startsWith('dark:text-')) : 'dark:text-pink-200'}`}>
+                                    Premium
+                                </span> or{' '}
+                                <span className={`font-semibold ${planColors.iconic.light.includes('text-') ? planColors.iconic.light.split(' ').find(cls => cls.startsWith('text-')) : 'text-blue-800'} ${planColors.iconic.dark.includes('text-') ? planColors.iconic.dark.split(' ').find(cls => cls.startsWith('dark:text-')) : 'dark:text-blue-200'}`}>
+                                    Iconic
+                                </span> plan.
+                                Users with the{' '}
+                                <span className={`font-semibold ${planColors.free.light.includes('text-') ? planColors.free.light.split(' ').find(cls => cls.startsWith('text-')) : 'text-purple-800'} ${planColors.free.dark.includes('text-') ? planColors.free.dark.split(' ').find(cls => cls.startsWith('dark:text-')) : 'dark:text-purple-200'}`}>
+                                    Free
+                                </span> plan do not have access to this feature.
+                                Upgrade your plan to unlock this and other exclusive benefits!
+                            </p>
+                            <div className="flex flex-col gap-4">
+                                <Link to="/pricing">
+                                    <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 font-bold py-3 px-6 rounded-lg text-lg">
+                                        Upgrade Your Plan
+                                    </Button>
+                                </Link>
+                                <Link to="/dashboard">
+                                    <Button variant="outline" className="w-full text-purple-600 border-purple-600 hover:bg-purple-50 dark:text-purple-300 dark:border-purple-300 dark:hover:bg-gray-700 py-3 px-6 rounded-lg text-lg">
+                                        Back to Dashboard
+                                    </Button>
+                                </Link>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <>
+                        {/* AI can make mistakes warning - Only show when a test has started */}
+                        {(showAiWarning && allGeneratedQuestions) && (
+                            <div className="mb-6 p-4 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center justify-between space-x-3">
+                                <div className="flex items-center space-x-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6 flex-shrink-0">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.174 3.35 1.9 3.35h13.713c1.726 0 2.766-1.85 1.9-3.35L13.723 3.545c-.892-1.547-3.033-1.547-3.925 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                    </svg>
+                                    <p className="text-sm font-medium">
+                                        Please be advised: While our AI aims for accuracy, content generated by artificial intelligence may occasionally contain inaccuracies or omissions. We recommend cross-referencing information for critical study.
+                                    </p>
                                 </div>
-                                {isCurrentQuestionAnswered && ( // Show explanation immediately after answering
-                                    <div className="mt-4 text-base bg-gray-100 dark:bg-gray-600 p-3 rounded-md border border-gray-200 dark:border-gray-500">
-                                        <p className="font-semibold text-green-700 dark:text-green-300">Correct Answer: {currentQuestion.answer}</p>
-                                        <p className="text-gray-600 dark:text-gray-300">
-                                            Explanation: {
-                                                currentQuestion.explanation.length > EXPLANATION_SUBSTRING_LENGTH
-                                                ? currentQuestion.explanation.substring(0, EXPLANATION_SUBSTRING_LENGTH) + '...'
-                                                : currentQuestion.explanation
-                                            }
-                                        </p>
-                                    </div>
-                                )}
-                            </CardContent>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowAiWarning(false)}
+                                    className="w-8 h-8 p-0 flex-shrink-0 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-200/50 dark:hover:bg-yellow-800/50"
+                                    aria-label="Close warning"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
                         )}
 
-                        {/* Navigation and Action Buttons */}
-                        <div className="flex flex-col gap-4 mt-8">
-                            {/* Only show navigation buttons if test is not submitted */}
-                            {!testSubmitted && (
-                                <div className="flex justify-between items-center gap-4">
-                                    <Button
-                                        onClick={goToPreviousQuestion}
-                                        className="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
-                                        disabled={currentQuestionDisplayIndex === 0 || loading || isLoadingMore || isCooldownActive}
-                                    >
-                                        Previous
-                                    </Button>
 
-                                    {currentQuestionDisplayIndex < requestedTotalQuestions - 1 ? (
-                                        // Not on the last requested question, show Next
-                                        <Button
-                                            onClick={goToNextQuestion}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
-                                            // Disable if loading, cooldown, or no more loaded questions to go to.
-                                            disabled={loading || isLoadingMore || isCooldownActive || (currentQuestionDisplayIndex >= (allGeneratedQuestions?.length || 0) - 1)}
-                                        >
-                                            Next
-                                        </Button>
-                                    ) : (
-                                        // On the last requested question (currentQuestionDisplayIndex === requestedTotalQuestions - 1)
-                                        <>
-                                            {shouldShowSubmitTest && ( // Show Submit Test if all questions are loaded
+                        {!allGeneratedQuestions ? (
+                            <TestGenerationForm onGenerate={handleGenerateTest} loading={loading} />
+                        ) : (
+                            <Card className="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-10 max-w-4xl mx-auto my-16 border-2 border-purple-200 dark:border-purple-700">
+                                <CardHeader className="text-center mb-6">
+                                    <CardTitle className="text-3xl font-bold text-purple-700 dark:text-purple-400 mb-2">
+                                        Question {currentQuestionDisplayIndex + 1} of {requestedTotalQuestions}
+                                    </CardTitle>
+                                </CardHeader>
+
+                                {currentQuestion && (
+                                    <CardContent className="mb-8 p-6 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-700">
+                                        <p className="font-bold text-xl mb-3 text-gray-900 dark:text-white">
+                                            {currentQuestionDisplayIndex + 1}. {currentQuestion.question}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {currentQuestion.options.map((option, optIndex) => {
+                                                const isSelected = userAnswers[currentQuestionDisplayIndex] === option;
+                                                const isCorrect = option === currentQuestion.answer;
+                                                const hasAnswered = isCurrentQuestionAnswered; // Using the new derived state for per-question check
+
+                                                let optionClassName = `flex items-center p-2 rounded cursor-pointer transition-colors duration-200 `;
+
+                                                if (hasAnswered) {
+                                                    if (isSelected && isCorrect) {
+                                                        optionClassName += 'bg-green-100 dark:bg-green-900/30 font-bold text-green-800 dark:text-green-200';
+                                                    } else if (isSelected && !isCorrect) {
+                                                        optionClassName += 'bg-red-100 dark:bg-red-900/30 font-bold text-red-800 dark:text-red-200';
+                                                    } else if (isCorrect) {
+                                                        optionClassName += 'bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600';
+                                                    } else {
+                                                        optionClassName += 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600';
+                                                    }
+                                                } else {
+                                                    // Before answering, only highlight on hover/selection
+                                                    optionClassName += `${isSelected ? 'bg-purple-100 dark:bg-purple-900/30 border border-purple-400 dark:border-purple-600' : 'bg-gray-50 dark:bg-gray-700'} hover:bg-gray-100 dark:hover:bg-gray-600`;
+                                                }
+
+                                                return (
+                                                    <label key={optIndex} className={optionClassName}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`question-${currentQuestionDisplayIndex}`}
+                                                            value={option}
+                                                            checked={isSelected}
+                                                            onChange={() => handleAnswerChange(currentQuestionDisplayIndex, option)}
+                                                            className="mr-2 accent-purple-600 dark:accent-purple-400"
+                                                            disabled={hasAnswered || testSubmitted} // Disable once answered or test submitted
+                                                        />
+                                                        <span className={`text-gray-800 dark:text-gray-200 ${hasAnswered && isCorrect ? 'font-bold' : ''}`}>
+                                                            {option}
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                        {isCurrentQuestionAnswered && ( // Show explanation immediately after answering
+                                            <div className="mt-4 text-base bg-gray-100 dark:bg-gray-600 p-3 rounded-md border border-gray-200 dark:border-gray-500">
+                                                <p className="font-semibold text-green-700 dark:text-green-300">Correct Answer: {currentQuestion.answer}</p>
+                                                <p className="text-gray-600 dark:text-gray-300">
+                                                    Explanation: {
+                                                        currentQuestion.explanation.length > EXPLANATION_SUBSTRING_LENGTH
+                                                            ? currentQuestion.explanation.substring(0, EXPLANATION_SUBSTRING_LENGTH) + '...'
+                                                            : currentQuestion.explanation
+                                                    }
+                                                </p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                )}
+
+                                {/* Navigation and Action Buttons */}
+                                <div className="flex flex-col gap-4 mt-8">
+                                    {/* Only show navigation buttons if test is not submitted */}
+                                    {!testSubmitted && (
+                                        <div className="flex justify-between items-center gap-4">
+                                            <Button
+                                                onClick={goToPreviousQuestion}
+                                                className="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
+                                                disabled={currentQuestionDisplayIndex === 0 || loading || isLoadingMore || isCooldownActive}
+                                            >
+                                                Previous
+                                            </Button>
+
+                                            {currentQuestionDisplayIndex < requestedTotalQuestions - 1 ? (
+                                                // Not on the last requested question, show Next
                                                 <Button
-                                                    onClick={handleSubmitTest}
-                                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
-                                                    disabled={loading || isLoadingMore || isCooldownActive}
+                                                    onClick={goToNextQuestion}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
+                                                    // Disable if loading, cooldown, or no more loaded questions to go to.
+                                                    disabled={loading || isLoadingMore || isCooldownActive || (currentQuestionDisplayIndex >= (allGeneratedQuestions?.length || 0) - 1)}
                                                 >
-                                                    Submit Test
+                                                    Next
                                                 </Button>
+                                            ) : (
+                                                // On the last requested question (currentQuestionDisplayIndex === requestedTotalQuestions - 1)
+                                                <>
+                                                    {shouldShowSubmitTest && ( // Show Submit Test if all questions are loaded
+                                                        <Button
+                                                            onClick={handleSubmitTest}
+                                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
+                                                            disabled={loading || isLoadingMore || isCooldownActive}
+                                                        >
+                                                            Submit Test
+                                                        </Button>
+                                                    )}
+                                                    {/* "Start New Test" button always present on the last question, alongside Submit if applicable */}
+                                                    <Button
+                                                        onClick={handleGenerateNewTest}
+                                                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
+                                                        disabled={loading || isLoadingMore || isCooldownActive}
+                                                    >
+                                                        Start New Test
+                                                    </Button>
+                                                </>
                                             )}
-                                            {/* "Start New Test" button always present on the last question, alongside Submit if applicable */}
+                                        </div>
+                                    )}
+
+                                    {/* Load More Button Logic */}
+                                    {shouldShowLoadMore && (
+                                        <Button
+                                            onClick={handleLoadMoreQuestions}
+                                            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
+                                            disabled={loading || isLoadingMore || isCooldownActive}
+                                        >
+                                            Load More Questions
+                                        </Button>
+                                    )}
+                                    {isCooldownActive && (
+                                        <div className="text-center text-gray-600 dark:text-gray-400 font-semibold w-full py-2 px-4 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                            Generating next batch in {cooldownTimer} seconds...
+                                        </div>
+                                    )}
+                                    {isLoadingMore && (
+                                        <div className="text-center text-gray-600 dark:text-gray-400 font-semibold w-full py-2 px-4 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                            Loading more questions...
+                                        </div>
+                                    )}
+
+                                    {/* Results Display */}
+                                    {testSubmitted && (
+                                        <>
+                                            <div className="text-center text-xl font-bold mt-6 mb-4 text-gray-900 dark:text-white">
+                                                Your Score: {score} / {allGeneratedQuestions?.length}
+                                            </div>
                                             <Button
                                                 onClick={handleGenerateNewTest}
-                                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex-1"
-                                                disabled={loading || isLoadingMore || isCooldownActive}
+                                                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
                                             >
-                                                Start New Test
+                                                Generate New Test
                                             </Button>
                                         </>
                                     )}
                                 </div>
-                            )}
-
-                            {/* Load More Button Logic */}
-                            {shouldShowLoadMore && (
-                                <Button
-                                    onClick={handleLoadMoreQuestions}
-                                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
-                                    disabled={loading || isLoadingMore || isCooldownActive}
-                                >
-                                    Load More Questions
-                                </Button>
-                            )}
-                            {isCooldownActive && (
-                                <div className="text-center text-gray-600 dark:text-gray-400 font-semibold w-full py-2 px-4 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
-                                    Generating next batch in {cooldownTimer} seconds...
-                                </div>
-                            )}
-                            {isLoadingMore && (
-                                <div className="text-center text-gray-600 dark:text-gray-400 font-semibold w-full py-2 px-4 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
-                                    Loading more questions...
-                                </div>
-                            )}
-
-                            {/* Results Display */}
-                            {testSubmitted && (
-                                <>
-                                    <div className="text-center text-xl font-bold mt-6 mb-4 text-gray-900 dark:text-white">
-                                        Your Score: {score} / {allGeneratedQuestions?.length}
-                                    </div>
-                                    <Button
-                                        onClick={handleGenerateNewTest}
-                                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
-                                    >
-                                        Generate New Test
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-                    </Card>
+                            </Card>
+                        )}
+                    </>
                 )}
             </div>
             {/* Footer Text */}

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,10 +6,60 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Bot, Zap, Brain, FileText, Moon, Sun, MessageSquare } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query'; // Import useQuery
+import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 
 const AI = () => {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+
+  // Get user profile data
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
+  // Define plan color schemes
+  const planColors = {
+    'free': {
+      light: 'bg-purple-100 text-purple-800 border-purple-300',
+      dark: 'dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700'
+    },
+    'premium': {
+      light: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      dark: 'dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-700'
+    },
+    'pro': {
+      light: 'bg-green-100 text-green-800 border-green-300',
+      dark: 'dark:bg-green-900/30 dark:text-green-200 dark:border-green-700'
+    },
+    // Add more plans as needed
+    'default': { // Fallback for unknown plans
+      light: 'bg-gray-100 text-gray-800 border-gray-300',
+      dark: 'dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+    }
+  };
+
+  // Determine the user's plan and its display name
+  const rawUserPlan = profile?.plan?.toLowerCase() || 'free'; // Ensure lowercase for lookup
+  const userPlanDisplayName = rawUserPlan.charAt(0).toUpperCase() + rawUserPlan.slice(1) + ' Plan';
+
+  // Get the color classes for the current plan
+  const currentPlanColorClasses = planColors[rawUserPlan] || planColors['default'];
 
   return (
     <div className="min-h-screen w-full bg-white dark:bg-gray-900">
@@ -20,18 +69,22 @@ const AI = () => {
           <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          
+
           <div className="flex items-center space-x-3">
             <img src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" alt="Medistics Logo" className="w-8 h-8 object-contain" />
             <span className="text-xl font-bold text-gray-900 dark:text-white">AI Study Assistant</span>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-9 h-9 p-0 hover:scale-110 transition-transform duration-200">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700">
-              Basic Plan
+            {/* Dynamic Plan Badge with dynamic colors */}
+            <Badge
+              variant="secondary"
+              className={`${currentPlanColorClasses.light} ${currentPlanColorClasses.dark}`}
+            >
+              {userPlanDisplayName}
             </Badge>
             <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
               <span className="text-white font-bold text-sm">

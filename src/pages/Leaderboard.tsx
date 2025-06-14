@@ -1,4 +1,3 @@
-
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,10 +8,62 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileDropdown } from '@/components/ProfileDropdown';
+import React, { useState, useEffect } from 'react'; // Import React and useEffect
 
 const Leaderboard = () => {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+  const [userPlan, setUserPlan] = useState<string | null>(null); // State to store user's plan
+
+  // Define plan color schemes
+  const planColors = {
+    'free': {
+      light: 'bg-purple-100 text-purple-800 border-purple-300',
+      dark: 'dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700'
+    },
+    'premium': {
+      light: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      dark: 'dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-700'
+    },
+    'pro': {
+      light: 'bg-green-100 text-green-800 border-green-300',
+      dark: 'dark:bg-green-900/30 dark:text-green-200 dark:border-green-700'
+    },
+    // Add more plans as needed
+    'default': { // Fallback for unknown plans
+      light: 'bg-gray-100 text-gray-800 border-gray-300',
+      dark: 'dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+    }
+  };
+
+  // Function to get plan badge classes
+  const getPlanBadgeClasses = (plan: string) => {
+    const colors = planColors[plan as keyof typeof planColors] || planColors.default;
+    return `${colors.light} ${colors.dark}`;
+  };
+
+  // Fetch user's plan on component mount or when user changes
+  useEffect(() => {
+    const fetchUserPlan = async () => {
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user plan:', error);
+        } else if (data) {
+          setUserPlan(data.plan);
+        }
+      } else {
+        setUserPlan(null); // Clear plan if user logs out
+      }
+    };
+
+    fetchUserPlan();
+  }, [user]); // Dependency array: re-run when `user` object changes
 
   // Fetch leaderboard data with profiles
   const { data: leaderboardData = [], isLoading } = useQuery({
@@ -28,7 +79,7 @@ const Leaderboard = () => {
             time_taken,
             created_at
           `);
-        
+
         if (answersError) {
           console.error('Error fetching user answers:', answersError);
           return [];
@@ -38,7 +89,7 @@ const Leaderboard = () => {
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username, full_name');
-        
+
         if (profilesError) {
           console.error('Error fetching profiles:', profilesError);
           return [];
@@ -46,7 +97,7 @@ const Leaderboard = () => {
 
         // Calculate user statistics
         const userStats: Record<string, any> = {};
-        
+
         userAnswers?.forEach(answer => {
           if (!userStats[answer.user_id]) {
             userStats[answer.user_id] = {
@@ -57,7 +108,7 @@ const Leaderboard = () => {
               answers: []
             };
           }
-          
+
           userStats[answer.user_id].totalQuestions++;
           if (answer.is_correct) {
             userStats[answer.user_id].correctAnswers++;
@@ -86,10 +137,10 @@ const Leaderboard = () => {
                 }
               });
 
-            const accuracy = stats.totalQuestions > 0 ? 
+            const accuracy = stats.totalQuestions > 0 ?
               Math.round((stats.correctAnswers / stats.totalQuestions) * 100) : 0;
-            
-            const averageTime = stats.totalQuestions > 0 ? 
+
+            const averageTime = stats.totalQuestions > 0 ?
               Math.round(stats.totalTime / stats.totalQuestions) : 0;
 
             // Calculate total score (improved formula)
@@ -97,7 +148,7 @@ const Leaderboard = () => {
             const streakBonus = bestStreak * 5; // 5 points per best streak
             const accuracyBonus = accuracy; // 1 point per 1% accuracy
             const speedBonus = Math.max(0, 60 - averageTime); // Bonus for faster answers (assuming 60s max)
-            
+
             const totalScore = basePoints + streakBonus + accuracyBonus + speedBonus;
 
             return {
@@ -157,16 +208,16 @@ const Leaderboard = () => {
           <Link to="/dashboard" className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          
+
           <div className="flex items-center space-x-3">
-            <img 
-              src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png" 
-              alt="Medistics Logo" 
+            <img
+              src="/lovable-uploads/bf69a7f7-550a-45a1-8808-a02fb889f8c5.png"
+              alt="Medistics Logo"
               className="w-6 h-6 md:w-8 md:h-8 object-contain"
             />
             <span className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">Leaderboard</span>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
@@ -180,9 +231,16 @@ const Leaderboard = () => {
                 <Moon className="h-4 w-4" />
               )}
             </Button>
-            <Badge variant="secondary" className="hidden sm:block bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700 text-xs">
-              Free Plan
-            </Badge>
+            {/* Dynamically rendered user plan badge */}
+            {userPlan ? (
+              <Badge className={getPlanBadgeClasses(userPlan)}>
+                {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} Plan
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="hidden sm:block bg-gray-100 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600 text-xs">
+                Loading Plan...
+              </Badge>
+            )}
             <ProfileDropdown />
           </div>
         </div>
@@ -195,7 +253,7 @@ const Leaderboard = () => {
             🏆 Leaderboard
           </h1>
           <p className="text-base md:text-lg lg:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            See how you rank against the best medical students in Pakistan. 
+            See how you rank against the best medical students in Pakistan.
             Climb the ladder and prove your expertise!
           </p>
         </div>
@@ -237,8 +295,8 @@ const Leaderboard = () => {
         {leaderboardData.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
             {leaderboardData.slice(0, 3).map((entry, index) => (
-              <Card 
-                key={entry.id} 
+              <Card
+                key={entry.id}
                 className={`relative overflow-hidden hover:scale-105 transition-all duration-300 animate-fade-in bg-purple-100/70 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 backdrop-blur-sm ${
                   index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'
                 }`}
@@ -306,7 +364,7 @@ const Leaderboard = () => {
             ) : (
               <div className="space-y-2">
                 {leaderboardData.slice(3).map((entry, index) => (
-                  <div 
+                  <div
                     key={entry.id}
                     className="flex items-center space-x-3 md:space-x-4 p-3 rounded-lg bg-white/60 dark:bg-gray-800/50 hover:bg-purple-200/50 dark:hover:bg-purple-900/40 transition-all duration-300 border border-purple-100 dark:border-purple-800 backdrop-blur-sm"
                   >

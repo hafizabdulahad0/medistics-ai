@@ -86,6 +86,10 @@ const Checkout = () => {
     }
   };
 
+  const handlePaymentDone = () => {
+    window.open('https://forms.gle/fBx4EQG7MvZLkA8N9', '_blank');
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-white via-purple-50/30 to-pink-50/30 dark:bg-gradient-to-br dark:from-gray-900 dark:via-purple-900/10 dark:to-pink-900/10">
       {/* Header - Consistent with Dashboard */}
@@ -210,6 +214,16 @@ const Checkout = () => {
               </p>
             )}
           </div>
+        </div>
+
+        {/* Payment Done Button */}
+        <div className="text-center mt-8">
+          <Button
+            className="w-full md:w-auto bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 py-3 px-8 rounded-full text-lg font-semibold"
+            onClick={handlePaymentDone}
+          >
+            I am done with my payment
+          </Button>
         </div>
 
         {/* Note about Autopayment */}
