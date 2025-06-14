@@ -48,7 +48,7 @@ export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScre
           Choose Your Subject
         </h1>
         <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 px-4 sm:px-0">
-          Select the medical subject you want to practice
+          Select the MDCAT subject you want to practice
         </p>
       </div>
 
@@ -62,16 +62,15 @@ export const SubjectSelectionScreen = ({ onSubjectSelect }: SubjectSelectionScre
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <Card 
-              className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 ${
-                selectedSubject?.id === subject.id 
-                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30' 
-                  : 'border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700'
-              } bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 backdrop-blur-sm`}
+            <Card
+              className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-2 ${selectedSubject?.id === subject.id
+                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+                : 'border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700'
+                } bg-gradient-to-br from-purple-100/70 via-purple-50/50 to-pink-50/30 dark:from-purple-900/30 dark:via-purple-800/20 dark:to-pink-900/10 backdrop-blur-sm`}
               onClick={() => setSelectedSubject(subject)}
             >
               <CardHeader className="text-center px-4 sm:px-6 py-4 sm:py-6">
-                <div 
+                <div
                   className="w-12 h-12 sm:w-16 sm:h-16 rounded-full mx-auto flex items-center justify-center text-xl sm:text-2xl mb-3 sm:mb-4 bg-white/50 dark:bg-gray-800/50"
                   style={{ backgroundColor: subject.color ? `${subject.color}20` : '#9333ea20' }}
                 >

@@ -152,7 +152,7 @@ const Index = () => {
         </h1>
         
         <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          Join thousands of medical students across Pakistan. Practice MCQs, battle peers, and ace your exams with our AI-powered platform.
+          Join thousands of MDCAT Aspirants across Pakistan. Practice MCQs, battle peers, and ace your exams with our AI-powered platform.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>

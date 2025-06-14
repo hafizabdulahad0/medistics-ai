@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Brain, Wand2, BookOpen, Play } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client'; // Still needed for database save
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -25,66 +24,89 @@ export const AITestGenerator = ({ onTestGenerated }: AITestGeneratorProps) => {
   const [generatedTest, setGeneratedTest] = useState<any>(null);
 
   const handleGenerateTest = async () => {
+    // UI-related validation remains unchanged
     if (!user || !topic.trim()) {
-      toast.error('Please enter a topic');
+      toast.error('Please enter a topic.');
       return;
     }
 
-    setIsGenerating(true);
+    setIsGenerating(true); // UI state for loading indicator
     try {
-      // Call the AI test generation edge function
-      const { data, error } = await supabase.functions.invoke('generate-ai-test', {
-        body: {
+      // --- MODIFIED SECTION: Calling Flask Backend instead of Supabase Edge Function ---
+      // This is the only part that changes the underlying "how it works" without affecting the UI.
+      const response = await fetch('http://127.0.0.1:5000/generate-ai-test', { // <-- IMPORTANT: Ensure this matches your Flask app's URL and endpoint
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // If your Flask app requires specific authentication headers (e.g., JWT from user.token), add them here.
+          // Example: 'Authorization': `Bearer ${user.jwtToken}` (assuming useAuth provides a JWT)
+        },
+        body: JSON.stringify({
           topic: topic.trim(),
           difficulty,
-          questionCount,
-          customPrompt: customPrompt.trim()
-        }
+          questionCount, // Flask expects this camelCase key from the frontend
+          customPrompt: customPrompt.trim() // Flask expects this camelCase key from the frontend
+        })
       });
 
-      if (error) throw error;
-
-      if (!data?.questions || !Array.isArray(data.questions)) {
-        throw new Error('Invalid response from AI service');
+      // Standard error handling for fetch requests
+      if (!response.ok) {
+        const errorData = await response.json(); // Attempt to read error message from Flask
+        throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
       }
 
-      // Save the generated test to the database
+      // Parse the JSON response from Flask. This 'data' variable will contain the 'questions' array.
+      const data = await response.json(); 
+      // --- END MODIFIED SECTION ---
+
+      // UI-related validation for the received data remains unchanged
+      if (!data?.questions || !Array.isArray(data.questions)) {
+        throw new Error('Invalid response format from AI service: Expected a "questions" array.');
+      }
+
+      // Supabase database save remains completely unchanged, as per your requirement
       const { data: savedTest, error: saveError } = await supabase
         .from('ai_generated_tests')
         .insert({
-          user_id: user.id,
+          user_id: user.id, // Assumes `useAuth` provides the Supabase user ID
           topic,
           difficulty,
-          questions: data.questions,
+          questions: data.questions, // Using the questions array received from Flask
           total_questions: data.questions.length
         })
         .select()
         .single();
 
+      // Supabase error handling for database save remains unchanged
       if (saveError) throw saveError;
 
+      // UI state updates and toasts remain unchanged
       setGeneratedTest(savedTest);
       toast.success(`Generated ${data.questions.length} questions successfully!`);
       
+      // Callback for parent component remains unchanged
       if (onTestGenerated) {
         onTestGenerated(savedTest.id);
       }
-    } catch (error) {
+    } catch (error: any) { // Type 'any' for error to handle different error types gracefully
       console.error('Error generating test:', error);
-      toast.error('Failed to generate test. Please try again.');
+      toast.error(`Failed to generate test: ${error.message || 'An unknown error occurred. Please try again.'}`);
     } finally {
-      setIsGenerating(false);
+      setIsGenerating(false); // UI state update
     }
   };
 
+  // UI interaction functions remain unchanged
   const handleStartTest = () => {
     if (generatedTest) {
-      // Navigate to test taking interface or show test questions
       toast.success('Test is ready! You can now take the test.');
-      // In a real implementation, you would navigate to a test-taking page
+      console.log('Starting test with ID:', generatedTest.id);
+      // In a real application, this would trigger navigation to a test-taking page,
+      // likely passing `generatedTest.id` as a route parameter.
     }
   };
 
+  // Predefined topics and all JSX for UI rendering remain completely unchanged
   const predefinedTopics = [
     'Cardiovascular System',
     'Respiratory System',
@@ -118,6 +140,7 @@ export const AITestGenerator = ({ onTestGenerated }: AITestGeneratorProps) => {
                   placeholder="Enter a medical topic..."
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
+                  required
                 />
                 <div className="text-sm text-gray-600 dark:text-gray-400">Quick select:</div>
                 <div className="flex flex-wrap gap-2">
@@ -200,7 +223,7 @@ export const AITestGenerator = ({ onTestGenerated }: AITestGeneratorProps) => {
             </Button>
           </>
         ) : (
-          // Show generated test info
+          // Show generated test info and action buttons
           <div className="space-y-4">
             <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
               <h3 className="font-semibold text-green-800 dark:text-green-200 mb-2">✅ Test Generated Successfully!</h3>
@@ -231,7 +254,7 @@ export const AITestGenerator = ({ onTestGenerated }: AITestGeneratorProps) => {
         )}
 
         {!generatedTest && (
-          /* Info */
+          /* Info section remains unchanged */
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-sm text-blue-800 dark:text-blue-200">
             <div className="flex items-start space-x-2">
               <BookOpen className="h-4 w-4 mt-0.5 flex-shrink-0" />

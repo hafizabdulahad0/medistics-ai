@@ -19,7 +19,6 @@ import {
   Award,
   Book, // New icon for Study Materials
   Instagram, // New icon for Instagram
-  Construction // Icon for maintenance message
 } from 'lucide-react';
 import { Link } from 'react-router-dom'; 
 import { useTheme } from 'next-themes';
@@ -137,7 +136,7 @@ const Dashboard = () => {
       description: 'Test your knowledge with curated questions',
       icon: BookOpen,
       link: '/mcqs',
-      type: 'internal', 
+      type: 'internal', // Added type to differentiate internal/external links
       gradient: 'from-blue-500 to-cyan-500',
       bgGradient: 'from-blue-50 to-cyan-50',
       darkBgGradient: 'from-blue-900/30 to-cyan-900/30'
@@ -155,34 +154,32 @@ const Dashboard = () => {
     {
       title: 'Study Materials',
       description: 'Access notes, videos, and resources',
-      icon: Book, 
+      icon: Book, // Using Book icon
       link: '/study-materials',
       type: 'internal',
-      gradient: 'from-orange-500 to-rose-500', 
+      gradient: 'from-orange-500 to-rose-500', // New gradient for Study Materials
       bgGradient: 'from-orange-50 to-rose-50',
       darkBgGradient: 'from-orange-900/20 to-amber-900/10'
     },
     {
       title: 'Classrooms',
-      description: 'Join or create study groups (Under Maintenance)', // Updated description
+      description: 'Join or create study groups',
       icon: Users, 
       link: '/classrooms',
       type: 'internal',
       gradient: 'from-indigo-500 to-purple-500',
       bgGradient: 'from-indigo-50 to-purple-50',
-      darkBgGradient: 'from-purple-900/20 to-orange-900/20',
-      disabled: true // Marked as disabled
+      darkBgGradient: 'from-purple-900/20 to-orange-900/20' 
     },
     {
       title: 'Battle Arena',
-      description: 'Compete with other students (Under Maintenance)', // Updated description
+      description: 'Compete with other students',
       icon: Swords,
       link: '/battle',
       type: 'internal',
       gradient: 'from-red-500 to-orange-500',
       bgGradient: 'from-red-50 to-orange-50',
-      darkBgGradient: 'from-red-900/20 to-orange-900/20',
-      disabled: true // Marked as disabled
+      darkBgGradient: 'from-red-900/20 to-orange-900/20' 
     },
     {
       title: 'Leaderboard',
@@ -196,7 +193,7 @@ const Dashboard = () => {
     }
   ];
 
-  // New Premium Perks section - filtered for disabled features
+  // New Premium Perks section
   const premiumPerks = [
     {
       title: 'AI Test Generator',
@@ -210,23 +207,23 @@ const Dashboard = () => {
     },
     {
       title: 'AI Chatbot',
-      description: 'Get instant help from AI tutor (Under Maintenance)', // Updated description
+      description: 'Get instant help from AI tutor',
       icon: Zap,
       link: '/ai/chatbot',
       type: 'internal',
       gradient: 'from-green-500 to-emerald-500',
       bgGradient: 'from-green-50 to-emerald-50',
-      darkBgGradient: 'from-green-900/30 to-emerald-900/30',
+      darkBgGradient: 'from-green-900/30 to-emerald-900/30'
     },
     {
       title: 'Hire a Tutor',
       description: 'Get personalized 1-on-1 tutoring',
-      icon: Users, 
+      icon: Users, // Using Users for tutor, can be adjusted if better icon is available
       link: '/hire-tutor',
       type: 'internal',
       gradient: 'from-blue-600 to-indigo-600',
       bgGradient: 'from-blue-50 to-indigo-50',
-      darkBgGradient: 'from-blue-900/30 to-indigo-900/30',
+      darkBgGradient: 'from-blue-900/30 to-indigo-900/30'
     }
   ];
 
@@ -429,20 +426,10 @@ const Dashboard = () => {
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quick Actions</h2>
-          <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 p-4 mb-6 flex items-center space-x-3">
-            <Construction className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-            <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-              Classrooms and Battle Arena are currently undergoing maintenance. We appreciate your patience and will re-enable them soon!
-            </p>
-          </Card>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {quickActions.map((action, index) => (
               action.type === 'internal' ? (
-                <Link
-                  key={index}
-                  to={action.disabled ? '#' : action.link} // Change link to # if disabled
-                  className={action.disabled ? 'opacity-50 pointer-events-none' : ''} // Apply disabled styling
-                >
+                <Link key={index} to={action.link}>
                   <Card className={`group hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer bg-gradient-to-br ${action.bgGradient} dark:${action.darkBgGradient} border-purple-200 dark:border-purple-800 overflow-hidden relative`}>
                     <div className={`absolute inset-0 bg-gradient-to-r ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
                     <CardHeader className="relative">
@@ -496,19 +483,9 @@ const Dashboard = () => {
         {/* Premium Perks Section */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Premium Perks</h2>
-          <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 p-4 mb-6 flex items-center space-x-3">
-            <Construction className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-            <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-              The AI Chatbot is currently undergoing maintenance. We appreciate your patience and will re-enable it soon!
-            </p>
-          </Card>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {premiumPerks.map((action, index) => (
-              <Link
-                key={index}
-                to={action.disabled ? '#' : action.link} // Change link to # if disabled
-                className={action.disabled ? 'opacity-50 pointer-events-none' : ''} // Apply disabled styling
-              >
+              <Link key={index} to={action.link}>
                 <Card className={`group hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer bg-gradient-to-br ${action.bgGradient} dark:${action.darkBgGradient} border-purple-200 dark:border-purple-800 overflow-hidden relative`}>
                   <div className={`absolute inset-0 bg-gradient-to-r ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
                   <CardHeader className="relative">
