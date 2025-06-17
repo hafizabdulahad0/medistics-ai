@@ -13,15 +13,10 @@ import AITestGeneratorPage from '@/pages/AITestGenerator';
 import AIChatbotPage from '@/pages/AIChatbot';
 import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
-import Admin1 from '@/pages/Admin1';
 import Admin2 from '@/pages/Admin2';
 import Admin3 from '@/pages/Admin3';
-import Admin4 from '@/pages/Admin4';
-import Admin5 from '@/pages/Admin5';
 import Profile from '@/pages/Profile';
 import Pricing from '@/pages/Pricing';
-import Terms from '@/pages/Terms';
-import PrivacyPolicy from '@/pages/privacypolicy';
 import Checkout from '@/pages/Checkout';
 import NotFound from '@/pages/NotFound';
 import ChangePassword from '@/pages/ChangePassword';
@@ -56,19 +51,14 @@ function App() {
               <Route path="/ai/chatbot" element={<AIChatbotPage />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/admin" element={<Admin />} />
-              <Route path="/admin1" element={<Admin1 />} />
               <Route path="/admin2" element={<Admin2 />} />
               <Route path="/admin3" element={<Admin3 />} />
-              <Route path="/admin4" element={<Admin4 />} />
-              <Route path="/admin5" element={<Admin5 />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/password" element={<ChangePassword />} />
               <Route path="/profile/upgrade" element={<Profile />} />
               <Route path="/pricing" element={<Pricing />} />
-              <Route path="/privacypolicy" element={<PrivacyPolicy />} />
               <Route path="/mock-test" element={<MockTest />} />
               <Route path="/test-completed" element={<TestCompletionPage />} /> {/* New route for TestCompletionPage */}
-              <Route path="/terms" element={<Terms />} /> {/* New route for TestCompletionPage */}
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/classroom" element={<Classroom />} />
               <Route path="*" element={<NotFound />} />
