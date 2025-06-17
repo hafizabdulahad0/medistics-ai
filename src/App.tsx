@@ -15,6 +15,9 @@ import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
 import Admin2 from '@/pages/Admin2';
 import Admin3 from '@/pages/Admin3';
+import Admin4 from '@/pages/Admin4';
+import Admin5 from '@/pages/Admin5';
+import Admin3 from '@/pages/Admin3';
 import Profile from '@/pages/Profile';
 import Pricing from '@/pages/Pricing';
 import Checkout from '@/pages/Checkout';
@@ -53,6 +56,8 @@ function App() {
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin2" element={<Admin2 />} />
               <Route path="/admin3" element={<Admin3 />} />
+              <Route path="/admin4" element={<Admin4 />} />
+              <Route path="/admin5" element={<Admin5 />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/password" element={<ChangePassword />} />
               <Route path="/profile/upgrade" element={<Profile />} />
